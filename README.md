@@ -5,7 +5,7 @@ Coordinates continuous translation of [Obsidian](https://obsidian.md/) vaults in
 ## Install
 
 ```sh
-uv tool install tongues
+uv tool install git+https://github.com/dgretton/tongues.git
 ```
 
 **Always upgrade before use:**
@@ -105,7 +105,7 @@ tongues:
 
 ```sh
 # Standard workflow
-uv tool install tongues        # install if absent
+uv tool install git+https://github.com/dgretton/tongues.git  # install if absent
 uv tool upgrade tongues        # always upgrade first
 tongues status                 # get the full picture
 tongues check notes/foo.md     # drill into a specific file

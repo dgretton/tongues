@@ -35,7 +35,7 @@ This vault uses **tongues** to coordinate translations into multiple languages.
 
 ## For AI agents and terminal users
 
-**Install** (if not present): `uv tool install tongues`
+**Install** (if not present): `uv tool install git+https://github.com/dgretton/tongues.git`
 **Always update before use**: `uv tool upgrade tongues`
 **Check status**: `tongues status`
 **Check a specific file**: `tongues check <path/to/file.md>`

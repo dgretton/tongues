@@ -152,7 +152,7 @@ def main() -> None:
 
     \b
     Quick start for AI agents:
-      uv tool install tongues          # install if absent
+      uv tool install git+https://github.com/dgretton/tongues.git  # install if absent
       uv tool upgrade tongues          # always upgrade before use
       tongues status                   # see what needs work
       tongues check <file.md>          # inspect a specific original
