@@ -321,8 +321,8 @@ def check(file: str) -> None:
                 f"[<original title>]({original.rel_path})[/bold]"
             )
             console.print(
-                f"  Then a blank line, then the translated content "
-                f"({len(original.content_lines)} lines to match)."
+                f"  Then a blank line, then {len(original.content_lines)} lines of body content "
+                f"(matching the original's body, headers excluded on both sides)."
             )
             continue
 
@@ -440,14 +440,15 @@ def inspect(file: str, lang: str) -> None:
     if not result.line_count_match:
         console.print(
             f"[bold yellow]Line count mismatch[/bold yellow]: "
-            f"original has {result.original_content_lines} content lines, "
-            f"translation has {result.translation_content_lines}."
+            f"original body has {result.original_content_lines} lines, "
+            f"translation body has {result.translation_content_lines} "
+            f"(headers excluded on both sides)."
         )
         diff = result.translation_content_lines - result.original_content_lines
         if diff > 0:
-            console.print(f"  Translation has [yellow]{diff} extra[/yellow] line(s). Remove them.")
+            console.print(f"  Translation body has [yellow]{diff} extra[/yellow] line(s). Remove them.")
         else:
-            console.print(f"  Translation is [yellow]{-diff} short[/yellow]. Add missing lines.")
+            console.print(f"  Translation body is [yellow]{-diff} line(s) short[/yellow]. Add missing lines.")
         console.print()
 
     # Issues table

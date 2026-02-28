@@ -48,7 +48,7 @@ Run `tongues header <file>` to generate the correct text.
 Line 1 of every translation:
 
 ```
-Traducido del inglés: [Note Title](../path/to/original.md)
+Traducido de: [Note Title](../path/to/original.md)
 
 # Título de la nota
 ...
@@ -56,7 +56,11 @@ Traducido del inglés: [Note Title](../path/to/original.md)
 
 ### What counts as a valid translation
 
-1. Same number of content lines as the original (after stripping headers).
+Headers are stripped from both files before any comparison: the original's language-link
+line (+ following blank) and the translation's `translated_from` line (+ following blank)
+are excluded. Only the body content is compared.
+
+1. Same number of body lines as the original (headers excluded on both sides).
 2. Heading levels match at every line position.
 3. Bullet/list structure matches at every line position.
 4. Lines that contain links in the original also contain links in the translation
@@ -93,7 +97,7 @@ tongues:
   languages:
     - code: es
       name: español
-      translated_from: "Traducido del inglés"
+      translated_from: "Traducido de"
     - code: zh
       name: 中文
       translated_from: "从英语翻译"
