@@ -1,7 +1,7 @@
 """
 Configuration parsing for tongues.
 
-Config lives in .tongues.md at the vault root — a Markdown file with YAML
+Config lives in tongues.md at the vault root — a Markdown file with YAML
 frontmatter, so it's Obsidian-syncable and human-readable.
 """
 
@@ -11,7 +11,7 @@ import yaml
 from dataclasses import dataclass
 from pathlib import Path
 
-CONFIG_FILENAME = ".tongues.md"
+CONFIG_FILENAME = "tongues.md"
 
 DEFAULT_CONFIG_CONTENT = """\
 ---
@@ -107,7 +107,7 @@ class TonguesConfig:
 
 
 def find_config(start: Path) -> Path | None:
-    """Walk up from start looking for .tongues.md."""
+    """Walk up from start looking for tongues.md."""
     current = start.resolve()
     while True:
         candidate = current / CONFIG_FILENAME
@@ -120,7 +120,7 @@ def find_config(start: Path) -> Path | None:
 
 
 def parse_config(config_path: Path) -> TonguesConfig:
-    """Parse a .tongues.md file and return a TonguesConfig."""
+    """Parse a tongues.md file and return a TonguesConfig."""
     text = config_path.read_text(encoding="utf-8")
 
     if not text.startswith("---"):
@@ -166,7 +166,7 @@ def parse_config(config_path: Path) -> TonguesConfig:
 
 
 def load_config(start: Path | None = None) -> TonguesConfig:
-    """Find and parse the nearest .tongues.md, raising clearly if absent."""
+    """Find and parse the nearest tongues.md, raising clearly if absent."""
     if start is None:
         start = Path.cwd()
     config_path = find_config(start)

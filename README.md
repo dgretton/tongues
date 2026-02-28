@@ -18,7 +18,7 @@ uv tool upgrade tongues
 
 ```sh
 cd /path/to/your/vault
-tongues init          # creates .tongues.md — edit it to set your languages
+tongues init          # creates tongues.md — edit it to set your languages
 tongues status        # see overall completion and what needs work
 tongues check <file>  # inspect a specific original and all its translations
 ```
@@ -78,11 +78,11 @@ When translating a file, **every internal link must point to the same-language v
 | `tongues where <file> <lang>` | Print the path where a translation should live |
 | `tongues header <file>` | Generate the language-link header for an original |
 | `tongues languages` | List configured languages |
-| `tongues init` | Create a `.tongues.md` config in the current directory |
+| `tongues init` | Create a `tongues.md` config in the current directory |
 
 ## Configuration
 
-`.tongues.md` at the vault root — Markdown with YAML frontmatter (Obsidian-syncable):
+`tongues.md` at the vault root — Markdown with YAML frontmatter (Obsidian-syncable):
 
 ```yaml
 ---

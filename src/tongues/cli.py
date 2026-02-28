@@ -167,7 +167,7 @@ def main() -> None:
 @main.command()
 @click.option("--force", is_flag=True, help="Overwrite existing config.")
 def init(force: bool) -> None:
-    """Create a .tongues.md config file in the current directory."""
+    """Create a tongues.md config file in the current directory."""
     config_path = Path.cwd() / CONFIG_FILENAME
     if config_path.exists() and not force:
         console.print(
