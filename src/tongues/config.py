@@ -54,7 +54,7 @@ This vault uses **tongues** to coordinate translations into multiple languages.
 ### Original file header (add once translations exist)
 
 ```
-[español](.translations/notename-a1b2c3d4-es.md) | [中文](.translations/notename-a1b2c3d4-zh.md)
+ [español](.translations/notename-a1b2c3d4-es.md) | [中文](.translations/notename-a1b2c3d4-zh.md)
 
 # Note Title
 ...

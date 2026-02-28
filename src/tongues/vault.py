@@ -84,7 +84,13 @@ def _parse_original_header(lines: list[str]) -> tuple[OriginalHeader | None, int
     if not lines:
         return None, 0
 
-    first = lines[0].strip()
+    raw = lines[0]
+
+    # Must start with exactly one leading space (Obsidian cursor-offset convention)
+    if not raw.startswith(" ") or raw.startswith("  "):
+        return None, 0
+
+    first = raw.strip()
     links = LINK_RE.findall(first)
     if not links:
         return None, 0

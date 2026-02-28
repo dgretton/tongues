@@ -301,11 +301,8 @@ def check(file: str) -> None:
     if original.header:
         console.print(f"  Header: [green]present[/green] ({len(original.header.language_links)} language link(s))")
     else:
-        console.print(
-            "  Header: [yellow]absent[/yellow] — add a language-link line at the top "
-            "once translations exist.\n"
-            f"  Run [bold]tongues header {original.rel_path}[/bold] to generate it."
-        )
+        console.print(f"  Header: [bold yellow]ACTION NEEDED[/bold yellow] — no language-link line found on line 1.")
+        console.print(f"  → Run [bold]tongues header {original.rel_path}[/bold] to generate it, then add it to the file.")
 
     console.print(f"  Content lines: {len(original.content_lines)}")
     console.print()
@@ -528,9 +525,10 @@ def header(file: str) -> None:
         rel = translation_rel_path(config, original.rel_path, lang.code)
         links.append(f"[{lang.name}]({rel})")
 
-    header_line = " | ".join(links)
+    header_line = " " + " | ".join(links)  # leading space keeps Obsidian cursor off the link
     console.print()
     console.print("[bold]Paste this as line 1 of the original file, followed by a blank line:[/bold]")
+    console.print("[dim](Note the single leading space — required to keep the Obsidian cursor off the link.)[/dim]")
     console.print()
     console.print(f"  {header_line}")
     console.print()

@@ -35,7 +35,7 @@ tongues check <file>  # inspect a specific original and all its translations
 Once translations exist, add a language-link bar as line 1:
 
 ```
-[español](.translations/notename-a1b2c3d4-es.md) | [中文](.translations/notename-a1b2c3d4-zh.md)
+ [español](.translations/notename-a1b2c3d4-es.md) | [中文](.translations/notename-a1b2c3d4-zh.md)
 
 # Note Title
 ...
