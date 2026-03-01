@@ -73,8 +73,11 @@ def _parse_original_header(
     If the first line looks like a language-link bar, parse it.
     Returns (header_or_None, content_start_index).
 
-    Expected format (with one leading space):
-      [[Mi Nota-es|español]] | [[我的笔记-zh|中文]]
+    Expected format:
+      • [[Mi Título de Nota|español]] • [[我的笔记标题|中文]] •
+
+    Line must start with '•', contain at least one wiki-link, and contain
+    nothing besides wiki-links, '•' bullets, and whitespace.
 
     The display text of each wiki-link is matched against configured language
     names (case-insensitive) to determine which language it corresponds to.
@@ -84,19 +87,17 @@ def _parse_original_header(
     if not lines:
         return None, 0
 
-    raw = lines[0]
+    first = lines[0].strip()
 
-    # Must start with exactly one leading space (Obsidian cursor-offset convention)
-    if not raw.startswith(" ") or raw.startswith("  "):
+    if not first.startswith("•"):
         return None, 0
 
-    first = raw.strip()
     wiki_links = WIKI_LINK_RE.findall(first)  # [(note_name, display), ...]
     if not wiki_links:
         return None, 0
 
-    # Line must contain ONLY wiki-links and separators (|, spaces)
-    cleaned = WIKI_LINK_RE.sub("", first).replace("|", "").strip()
+    # Line must contain ONLY wiki-links, '•' bullets, and whitespace
+    cleaned = WIKI_LINK_RE.sub("", first).replace("•", "").strip()
     if cleaned:
         return None, 0
 

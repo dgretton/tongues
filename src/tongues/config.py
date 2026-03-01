@@ -60,18 +60,20 @@ each one simply needs a translation into every other configured language.
 
 ### Original file header (add incrementally as translations are created)
 
-Each time you create a translation, add a wiki-link on line 1 of the original
-(create the line if absent, or append `|` and the new link if it already exists):
+Each time you create a translation, add a wiki-link on line 1 of the original.
+Use `•` as separator and bookend. Create the line if absent, or insert the new
+link before the trailing `•` if the line already exists:
 
 ```
- [[Mi Título de Nota-es|español]] | [[我的笔记标题-zh|中文]]
+• [[Mi Título de Nota|español]] • [[我的笔记标题|中文]] •
 
 # Note Title
 ...
 ```
 
 The wiki-link target (before `|`) is the note name Obsidian uses to find the
-translation. No path is needed — Obsidian resolves it by name.
+translation. No path is needed — Obsidian resolves it by name. In rendered
+view this line reads simply: `• español • 中文 •`
 
 ### Translation file header (required)
 

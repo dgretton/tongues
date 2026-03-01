@@ -290,7 +290,7 @@ def status(show_all: bool) -> None:
                 console.print(
                     f"    [dim]No {r.language.name} link in header — "
                     f"add one when you create the translation: "
-                    f"[[translated-title-{r.language.code}|{r.language.name}]][/dim]"
+                    f"• [[translated-title|{r.language.name}]] •[/dim]"
                 )
                 continue
 
@@ -372,7 +372,7 @@ def check(file: str) -> None:
             f" — {names_str}"
         )
     else:
-        console.print(f"  Header: [dim]none yet[/dim] — add a link each time you create a translation")
+        console.print(f"  Header: [dim]none yet[/dim] — add a bullet link each time you create a translation: • [[title|lang]] •")
 
     console.print(f"  Content lines: {len(original.content_lines)}")
     console.print()
@@ -483,11 +483,11 @@ def inspect(file: str, lang: str) -> None:
         console.print()
         console.print(f"[bold red]No translation path declared for {lang_obj.name}.[/bold red]")
         console.print(
-            f"Add a wiki-link to line 1 of {original.rel_path}:\n"
-            f"  [bold][[{original.path.stem}-{lang}|{lang_obj.name}]][/bold]"
+            f"Add a bullet link to line 1 of {original.rel_path}:\n"
+            f"  [bold]• [[translated-title|{lang_obj.name}]] •[/bold]"
         )
         console.print(
-            f"Replace '{original.path.stem}-{lang}' with the translated title, "
+            f"Replace 'translated-title' with the actual translated title, "
             f"then create the translation file."
         )
         all_files = scan_vault(config)
@@ -602,7 +602,7 @@ def where(file: str, lang: str) -> None:
         err_console.print(
             f"[red]No {lang_obj.name} link in header[/red] of {original.rel_path}.\n"
             f"Add one when you create the translation: "
-            f"[[translated-title-{lang}|{lang_obj.name}]]"
+            f"• [[translated-title|{lang_obj.name}]] •"
         )
         sys.exit(1)
 
