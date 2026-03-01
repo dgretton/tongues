@@ -344,29 +344,41 @@ def check(file: str) -> None:
     console.print(f"[bold]Checking:[/bold] {original.rel_path}")
 
     # Header status
-    if original.header:
-        n = len(original.header.language_links)
-        console.print(f"  Header: [green]present[/green] ({n} language link(s))")
+    n_configured = len(config.languages)
+    if original.header and original.header.language_links:
+        linked_names = [
+            lang.name for lang in config.languages
+            if lang.code in original.header.language_links
+        ]
+        n_linked = len(linked_names)
+        names_str = ", ".join(linked_names)
+        style = "green" if n_linked == n_configured else "yellow"
+        console.print(
+            f"  Header: [{style}]{n_linked} of {n_configured} languages[/{style}]"
+            f" — {names_str}"
+        )
     else:
-        console.print(f"  Header: [dim]none yet[/dim] — add a link here each time you create a translation:")
+        console.print(f"  Header: [dim]none yet[/dim] — add a link each time you create a translation")
 
     console.print(f"  Content lines: {len(original.content_lines)}")
     console.print()
 
     index = build_translation_index(all_files)
 
-    for lang in config.languages:
-        exp_path = declared_translation_path(config, original, lang)
-        console.rule(f"[bold]{lang.name}[/bold] [{lang.code}]", style="dim")
+    declared = [
+        (lang, declared_translation_path(config, original, lang))
+        for lang in config.languages
+        if declared_translation_path(config, original, lang) is not None
+    ]
 
-        if exp_path is None:
-            console.print(f"  [bold red]NO PATH[/bold red]  — no [[...]] link declared for {lang.name}")
-            console.print(f"  Add a wiki-link to the original's header:")
-            console.print(
-                f"    [bold][[{original.path.stem}-{lang.code}|{lang.name}]][/bold]"
-                f"  (replace '{original.path.stem}-{lang.code}' with the translated title)"
-            )
-            continue
+    if not declared:
+        console.print("[dim]No translations declared yet.[/dim]")
+        _print_link_universe_reminder(config, original, all_files)
+        console.print()
+        return
+
+    for lang, exp_path in declared:
+        console.rule(f"[bold]{lang.name}[/bold] [{lang.code}]", style="dim")
 
         exp_rel = exp_path.relative_to(config.vault_root)
 
