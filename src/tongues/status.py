@@ -5,11 +5,11 @@ Enumerates every (original × configured_language) pair and checks whether
 a valid translation exists. Drives the top-level `tongues status` output.
 
 Progress formula:
-  completed / total = (originals + ok_translations) / (originals × (languages + 1))
+  (originals + ok_translations) / (originals × languages)
 
-The +1 in the denominator accounts for each original being a document in some
-language — the original itself "fills" one language slot. This reaches exactly
-100% when every original has a valid translation in every configured language.
+Originals count in the numerator because each one represents content that already
+exists. The formula starts at 1/T (e.g. 50% with 2 languages) and reaches 100%
+when every original has a valid translation in every configured language.
 """
 
 from __future__ import annotations
@@ -86,19 +86,17 @@ class VaultStatus:
 
     @property
     def total_expected(self) -> int:
-        # Each original occupies one language slot (its own), plus one per configured language
-        return len(self.originals) * (len(self.config.languages) + 1)
+        return len(self.originals) * len(self.config.languages)
 
     @property
     def completed(self) -> int:
-        # Each original counts as 1 (for its own language); each ok translation counts as 1
         return len(self.originals) + sum(1 for r in self.records if r.is_ok)
 
     @property
     def percentage(self) -> float:
         if self.total_expected == 0:
             return 100.0
-        return 100.0 * self.completed / self.total_expected
+        return min(100.0, 100.0 * self.completed / self.total_expected)
 
     def needs_work(self) -> list[TranslationRecord]:
         return [r for r in self.records if not r.is_ok]
