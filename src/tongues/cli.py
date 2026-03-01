@@ -274,8 +274,9 @@ def status(show_all: bool) -> None:
             if r.status == "unmapped":
                 console.print(f"  [{style}]{label:12}[/{style}] [{r.language.code}]")
                 console.print(
-                    f"    [dim]No {r.language.name} link in header. "
-                    f"Run: tongues header {orig_rel}[/dim]"
+                    f"    [dim]No {r.language.name} link in header — "
+                    f"add one when you create the translation: "
+                    f"[[translated-title-{r.language.code}|{r.language.name}]][/dim]"
                 )
                 continue
 
@@ -347,8 +348,7 @@ def check(file: str) -> None:
         n = len(original.header.language_links)
         console.print(f"  Header: [green]present[/green] ({n} language link(s))")
     else:
-        console.print(f"  Header: [bold yellow]ACTION NEEDED[/bold yellow] — no language-link line found on line 1.")
-        console.print(f"  → Run [bold]tongues header {original.rel_path}[/bold] to generate a template.")
+        console.print(f"  Header: [dim]none yet[/dim] — add a link here each time you create a translation:")
 
     console.print(f"  Content lines: {len(original.content_lines)}")
     console.print()
@@ -574,51 +574,15 @@ def where(file: str, lang: str) -> None:
 
     if exp_path is None:
         err_console.print(
-            f"[red]No {lang_obj.name} path declared[/red] in {original.rel_path}.\n"
-            f"Add a wiki-link to the header: [[translated-title-{lang}|{lang_obj.name}]]\n"
-            f"Or run: tongues header {original.rel_path}"
+            f"[red]No {lang_obj.name} link in header[/red] of {original.rel_path}.\n"
+            f"Add one when you create the translation: "
+            f"[[translated-title-{lang}|{lang_obj.name}]]"
         )
         sys.exit(1)
 
     exp_rel = exp_path.relative_to(config.vault_root)
     exists = "exists" if exp_path.exists() else "does not exist"
     console.print(f"{exp_rel}  [dim]({exists})[/dim]")
-
-
-# ---------------------------------------------------------------------------
-# tongues header
-# ---------------------------------------------------------------------------
-
-@main.command()
-@click.argument("file")
-def header(file: str) -> None:
-    """
-    Generate a language-link header template for an original file.
-
-    Prints a line to paste as line 1 of the original (followed by a blank
-    line). Each wiki-link target is a placeholder — replace it with the
-    translated title of this note in the target language.
-    """
-    config = _load_or_exit()
-    original = _resolve_original(config, file)
-
-    stem = original.path.stem
-    links = [f"[[{stem}-{lang.code}|{lang.name}]]" for lang in config.languages]
-
-    header_line = " " + " | ".join(links)
-    console.print()
-    console.print("[bold]Paste this as line 1 of the original file, followed by a blank line:[/bold]")
-    console.print("[dim](Leading space keeps the Obsidian cursor off the link.)[/dim]")
-    console.print()
-    console.print(f"  {header_line}")
-    console.print()
-    console.print(
-        f"[bold yellow]Action required:[/bold yellow] replace each placeholder note name "
-        f"(e.g. [bold]{stem}-{config.languages[0].code}[/bold]) "
-        f"with the translated title of this note in that language.\n"
-        f"The note name is the only pointer to the translation — choose it carefully."
-    )
-    console.print("[dim]Line 2 should be blank, then your content follows from line 3.[/dim]")
 
 
 # ---------------------------------------------------------------------------

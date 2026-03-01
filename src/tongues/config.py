@@ -40,7 +40,6 @@ each one simply needs a translation into every other configured language.
 **Check a specific file**: `tongues check <path/to/file.md>`
 **Inspect alignment detail**: `tongues inspect <path/to/file.md> <lang-code>`
 **Get translation file path**: `tongues where <path/to/file.md> <lang-code>`
-**Generate original's header**: `tongues header <path/to/file.md>`
 
 ## How translations work
 
@@ -53,10 +52,10 @@ each one simply needs a translation into every other configured language.
 - Note names must be unique across all originals for the same language.
   `tongues status` reports naming conflicts.
 
-### Original file header (add once translations exist)
+### Original file header (add incrementally as translations are created)
 
-Run `tongues header <file>` to generate a template, then paste it as line 1.
-Replace each placeholder note name with the translated title of this note:
+Each time you create a translation, add a wiki-link on line 1 of the original
+(create the line if absent, or append `|` and the new link if it already exists):
 
 ```
  [[Mi Título de Nota-es|español]] | [[我的笔记标题-zh|中文]]
