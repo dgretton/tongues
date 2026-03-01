@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .vault import VaultFile, HEADING_RE, BULLET_RE, LINK_RE, WIKI_LINK_RE
+from .vault import VaultFile, HEADING_RE, BULLET_RE, CHECKBOX_RE, LINK_RE, WIKI_LINK_RE
 
 
 def _count_links(line: str) -> int:
@@ -38,6 +38,9 @@ class AlignmentIssue:
     MISSING_LINKS = "missing_links"             # orig has links, trans has none
     SPURIOUS_LINKS = "spurious_links"           # trans has links, orig has none
     LINK_COUNT = "link_count_mismatch"          # both have links but different count
+    MISSING_CHECKBOX = "missing_checkbox"       # orig has checkbox, trans has plain bullet
+    SPURIOUS_CHECKBOX = "spurious_checkbox"     # trans has checkbox, orig has plain bullet
+    CHECKBOX_STATE = "checkbox_state_mismatch"  # both have checkboxes but different states
 
     def describe(self) -> str:
         t = self.issue_type
@@ -63,6 +66,16 @@ class AlignmentIssue:
             n_orig = _count_links(self.original_line)
             n_trans = _count_links(self.translation_line)
             return f"link count mismatch (original {n_orig}, translation {n_trans})\n    orig:  {orig}\n    trans: {trans}"
+        if t == self.MISSING_CHECKBOX:
+            return f"original has checkbox, translation has plain bullet\n    orig:  {orig}\n    trans: {trans}"
+        if t == self.SPURIOUS_CHECKBOX:
+            return f"translation has unexpected checkbox\n    orig:  {orig}\n    trans: {trans}"
+        if t == self.CHECKBOX_STATE:
+            o_state = CHECKBOX_RE.match(self.original_line).group(1)
+            t_state = CHECKBOX_RE.match(self.translation_line).group(1)
+            o_label = "checked" if o_state.lower() == "x" else f"[{o_state}]"
+            t_label = "checked" if t_state.lower() == "x" else f"[{t_state}]"
+            return f"checkbox state mismatch (original {o_label}, translation {t_label})\n    orig:  {orig}\n    trans: {trans}"
         return f"{t}\n    orig:  {orig}\n    trans: {trans}"
 
 
@@ -125,6 +138,17 @@ def check_alignment(original: VaultFile, translation: VaultFile) -> AlignmentRes
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.MISSING_BULLET, o, t))
         elif not o_bullet and t_bullet:
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.SPURIOUS_BULLET, o, t))
+
+        # --- checkboxes (subset of bullets — checked independently) ---
+        o_check = CHECKBOX_RE.match(o)
+        t_check = CHECKBOX_RE.match(t)
+
+        if o_check and not t_check:
+            result.issues.append(AlignmentIssue(line_num, AlignmentIssue.MISSING_CHECKBOX, o, t))
+        elif not o_check and t_check:
+            result.issues.append(AlignmentIssue(line_num, AlignmentIssue.SPURIOUS_CHECKBOX, o, t))
+        elif o_check and t_check and o_check.group(1).lower() != t_check.group(1).lower():
+            result.issues.append(AlignmentIssue(line_num, AlignmentIssue.CHECKBOX_STATE, o, t))
 
         # --- links (markdown + wiki-links) ---
         o_n = _count_links(o)

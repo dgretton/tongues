@@ -42,6 +42,9 @@ HEADING_RE = re.compile(r'^(#{1,6})\s')
 # Unordered or ordered bullet
 BULLET_RE = re.compile(r'^\s*([-*+]|\d+\.)\s')
 
+# Checkbox item: - [ ], - [x], - [/], etc. — captures the state character
+CHECKBOX_RE = re.compile(r'^\s*[-*+]\s+\[(.)\]')
+
 
 # ---------------------------------------------------------------------------
 # Header parsing
