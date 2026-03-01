@@ -1,8 +1,15 @@
 """
 Vault-wide translation status.
 
-Enumerates every (original × target_language) pair and checks whether
+Enumerates every (original × configured_language) pair and checks whether
 a valid translation exists. Drives the top-level `tongues status` output.
+
+Progress formula:
+  completed / total = (originals + ok_translations) / (originals × (languages + 1))
+
+The +1 in the denominator accounts for each original being a document in some
+language — the original itself "fills" one language slot. This reaches exactly
+100% when every original has a valid translation in every configured language.
 """
 
 from __future__ import annotations
@@ -14,8 +21,9 @@ from .config import TonguesConfig, Language
 from .vault import (
     VaultFile,
     scan_vault,
-    translation_path,
+    declared_translation_path,
     build_translation_index,
+    find_translation_collisions,
 )
 from .alignment import check_alignment, AlignmentResult
 
@@ -28,12 +36,14 @@ from .alignment import check_alignment, AlignmentResult
 class TranslationRecord:
     original: VaultFile
     language: Language
-    expected_path: Path             # where the translation file should live
-    translation: VaultFile | None   # None when file is absent
+    expected_path: Path | None      # None when no header entry declares a path
+    translation: VaultFile | None   # None when file is absent or unmapped
     alignment: AlignmentResult | None  # None when file is absent or header missing
 
     @property
     def status(self) -> str:
+        if self.expected_path is None:
+            return "unmapped"       # original has no header entry for this language
         if self.translation is None:
             return "missing"
         if self.translation.header is None:
@@ -53,6 +63,7 @@ class TranslationRecord:
     @property
     def status_label(self) -> str:
         return {
+            "unmapped": "NO PATH",
             "missing": "MISSING",
             "missing_header": "NO HEADER",
             "error": "ERROR",
@@ -71,14 +82,17 @@ class VaultStatus:
     config: TonguesConfig
     originals: list[VaultFile]
     records: list[TranslationRecord]
+    collisions: list[tuple[Language, Path, list[VaultFile]]]  # naming conflicts
 
     @property
     def total_expected(self) -> int:
-        return len(self.originals) * len(self.config.languages)
+        # Each original occupies one language slot (its own), plus one per configured language
+        return len(self.originals) * (len(self.config.languages) + 1)
 
     @property
     def completed(self) -> int:
-        return sum(1 for r in self.records if r.is_ok)
+        # Each original counts as 1 (for its own language); each ok translation counts as 1
+        return len(self.originals) + sum(1 for r in self.records if r.is_ok)
 
     @property
     def percentage(self) -> float:
@@ -107,8 +121,8 @@ def compute_status(config: TonguesConfig) -> VaultStatus:
 
     for original in originals:
         for lang in config.languages:
-            exp_path = translation_path(config, original.rel_path, lang.code)
-            trans_file = index.get(exp_path.resolve())
+            exp_path = declared_translation_path(config, original, lang)
+            trans_file = index.get(exp_path.resolve()) if exp_path is not None else None
 
             if trans_file is None:
                 alignment = None
@@ -125,4 +139,5 @@ def compute_status(config: TonguesConfig) -> VaultStatus:
                 alignment=alignment,
             ))
 
-    return VaultStatus(config=config, originals=originals, records=records)
+    collisions = find_translation_collisions(config, originals)
+    return VaultStatus(config=config, originals=originals, records=records, collisions=collisions)

@@ -15,7 +15,11 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .vault import VaultFile, HEADING_RE, BULLET_RE, LINK_RE
+from .vault import VaultFile, HEADING_RE, BULLET_RE, LINK_RE, WIKI_LINK_RE
+
+
+def _count_links(line: str) -> int:
+    return len(LINK_RE.findall(line)) + len(WIKI_LINK_RE.findall(line))
 
 
 @dataclass
@@ -56,8 +60,8 @@ class AlignmentIssue:
         if t == self.SPURIOUS_LINKS:
             return f"translation has link(s), original has none\n    orig:  {orig}\n    trans: {trans}"
         if t == self.LINK_COUNT:
-            n_orig = len(LINK_RE.findall(self.original_line))
-            n_trans = len(LINK_RE.findall(self.translation_line))
+            n_orig = _count_links(self.original_line)
+            n_trans = _count_links(self.translation_line)
             return f"link count mismatch (original {n_orig}, translation {n_trans})\n    orig:  {orig}\n    trans: {trans}"
         return f"{t}\n    orig:  {orig}\n    trans: {trans}"
 
@@ -122,15 +126,15 @@ def check_alignment(original: VaultFile, translation: VaultFile) -> AlignmentRes
         elif not o_bullet and t_bullet:
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.SPURIOUS_BULLET, o, t))
 
-        # --- links ---
-        o_links = LINK_RE.findall(o)
-        t_links = LINK_RE.findall(t)
+        # --- links (markdown + wiki-links) ---
+        o_n = _count_links(o)
+        t_n = _count_links(t)
 
-        if o_links and not t_links:
+        if o_n > 0 and t_n == 0:
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.MISSING_LINKS, o, t))
-        elif not o_links and t_links:
+        elif o_n == 0 and t_n > 0:
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.SPURIOUS_LINKS, o, t))
-        elif o_links and t_links and len(o_links) != len(t_links):
+        elif o_n > 0 and t_n > 0 and o_n != t_n:
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.LINK_COUNT, o, t))
 
     return result

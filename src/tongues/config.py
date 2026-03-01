@@ -16,9 +16,6 @@ CONFIG_FILENAME = "tongues.md"
 DEFAULT_CONFIG_CONTENT = """\
 ---
 tongues:
-  original_language:
-    code: en
-    name: English
   languages:
     - code: es
       name: español
@@ -32,6 +29,8 @@ tongues:
 # Tongues — Translation Configuration
 
 This vault uses **tongues** to coordinate translations into multiple languages.
+There is no "original language" — documents may be written in any language and
+each one simply needs a translation into every other configured language.
 
 ## For AI agents and terminal users
 
@@ -48,25 +47,33 @@ This vault uses **tongues** to coordinate translations into multiple languages.
 - **Originals** are any `.md` files outside the translations folder.
 - **Translated files** live flat inside the translations folder (default: `.translations/`).
   They are found via links, not the file tree — the whole folder can be hidden or deleted cleanly.
-- A translation filename is derived deterministically from the original's vault-relative path,
-  so `tongues where` always tells you exactly where to put a translation.
+- Translation note names are chosen by the translator — they should be the
+  translated title of the document in the target language. Conventionally add a
+  `-{lang-code}` suffix (e.g. `Mi Nota-es`) to keep languages distinguishable.
+- Note names must be unique across all originals for the same language.
+  `tongues status` reports naming conflicts.
 
 ### Original file header (add once translations exist)
 
+Run `tongues header <file>` to generate a template, then paste it as line 1.
+Replace each placeholder note name with the translated title of this note:
+
 ```
- [español](.translations/notename-a1b2c3d4-es.md) | [中文](.translations/notename-a1b2c3d4-zh.md)
+ [[Mi Título de Nota-es|español]] | [[我的笔记标题-zh|中文]]
 
 # Note Title
 ...
 ```
 
+The wiki-link target (before `|`) is the note name Obsidian uses to find the
+translation. No path is needed — Obsidian resolves it by name.
+
 ### Translation file header (required)
 
-Line 1 must be the `translated_from` phrase followed by a link to the original file.
-The phrase identifies the source by file (via the link), not by language name.
+Line 1 must be the `translated_from` phrase followed by a wiki-link to the original.
 
 ```
-Traducido de: [Note Title](../path/to/original.md)
+Traducido de: [[Original Note Name]]
 
 # Título de la nota
 ...
@@ -94,7 +101,7 @@ If original A links to original B, the Spanish translation of A must link to the
 Spanish translation of B (not to B itself). This creates parallel universes of links —
 a reader clicks their language once and stays in it as they follow every subsequent link.
 
-Use `tongues check <file>` to see the expected translation paths for every link in a file.
+Use `tongues check <file>` to see the expected wiki-link targets for every link in a file.
 """
 
 
@@ -109,8 +116,7 @@ class Language:
 class TonguesConfig:
     vault_root: Path
     config_path: Path
-    original_language: Language
-    languages: list[Language]       # target languages (not including original)
+    languages: list[Language]       # languages to translate into
     translations_folder: str        # relative to vault_root
 
 
@@ -146,28 +152,17 @@ def parse_config(config_path: Path) -> TonguesConfig:
     data = yaml.safe_load(yaml_text) or {}
     cfg = data.get("tongues", {})
 
-    orig_data = cfg.get("original_language", {"code": "en", "name": "English"})
-    original_language = Language(
-        code=orig_data["code"],
-        name=orig_data["name"],
-        translated_from="",  # originals don't use this field
-    )
-
     languages = []
     for lang_data in cfg.get("languages", []):
         languages.append(Language(
             code=lang_data["code"],
             name=lang_data["name"],
-            translated_from=lang_data.get(
-                "translated_from",
-                "Translated from",
-            ),
+            translated_from=lang_data.get("translated_from", "Translated from"),
         ))
 
     return TonguesConfig(
         vault_root=config_path.parent,
         config_path=config_path,
-        original_language=original_language,
         languages=languages,
         translations_folder=cfg.get("translations_folder", ".translations"),
     )

@@ -5,24 +5,35 @@ Every .md file in the vault is either:
   - An original  — lives anywhere outside the translations folder
   - A translation — lives inside the translations folder
 
-Translation filenames are deterministic:
-  {original-stem}-{sha256(rel_path)[:8]}-{lang_code}.md
+Originals carry a language-link header on line 1 (with a leading space):
 
-This means `tongues where` can always tell you exactly where a translation
-should live without reading the vault at all.
+  [[Mi Nota Traducida-es|español]] | [[我的翻译笔记-zh|中文]]
+
+Each wiki-link target is the note name of the translation (no path, no
+extension — Obsidian finds it by name). The display text is the language name
+as configured. The translation file lives in the translations folder under that
+exact name + ".md".
+
+Translation filenames are chosen by the translator — they should be the
+translated title of the original in the target language. There is no generated
+fallback; a translation is "unmapped" until the original's header declares it.
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
-from dataclasses import dataclass, field
+from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 from .config import TonguesConfig, Language
 
 # Matches Markdown inline links: [text](target)
 LINK_RE = re.compile(r'\[([^\]]*)\]\(([^)]*)\)')
+
+# Matches Obsidian wiki-links: [[note_name]] or [[note_name|display text]]
+# Groups: (note_name, display_text_or_empty_string)
+WIKI_LINK_RE = re.compile(r'\[\[([^\]|]+)(?:\|([^\]]*))?\]\]')
 
 # Heading: one or more # at start of line
 HEADING_RE = re.compile(r'^(#{1,6})\s')
@@ -32,38 +43,16 @@ BULLET_RE = re.compile(r'^\s*([-*+]|\d+\.)\s')
 
 
 # ---------------------------------------------------------------------------
-# Filename / path helpers
-# ---------------------------------------------------------------------------
-
-def translation_stem(original_rel_path: Path, lang_code: str) -> str:
-    """Return the stem (no extension) for a translation file."""
-    path_str = str(original_rel_path).replace("\\", "/")
-    hash_id = hashlib.sha256(path_str.encode()).hexdigest()[:8]
-    return f"{original_rel_path.stem}-{hash_id}-{lang_code}"
-
-
-def translation_filename(original_rel_path: Path, lang_code: str) -> str:
-    return translation_stem(original_rel_path, lang_code) + ".md"
-
-
-def translation_path(config: TonguesConfig, original_rel_path: Path, lang_code: str) -> Path:
-    """Absolute path where a translation should (or does) live."""
-    return config.vault_root / config.translations_folder / translation_filename(original_rel_path, lang_code)
-
-
-def translation_rel_path(config: TonguesConfig, original_rel_path: Path, lang_code: str) -> Path:
-    """Vault-relative path where a translation lives."""
-    return Path(config.translations_folder) / translation_filename(original_rel_path, lang_code)
-
-
-# ---------------------------------------------------------------------------
 # Header parsing
 # ---------------------------------------------------------------------------
 
 @dataclass
 class OriginalHeader:
-    """Language-link line at the top of an original file."""
-    # lang_code -> relative path string as written in the file
+    """Language-link line at the top of an original file.
+
+    language_links maps lang_code -> note_name (the wiki-link target, i.e.
+    the translation file's stem as Obsidian knows it, without extension).
+    """
     language_links: dict[str, str]
 
 
@@ -71,15 +60,25 @@ class OriginalHeader:
 class TranslationHeader:
     """'Translated from' line at the top of a translation file."""
     translated_from_phrase: str
-    original_link_text: str     # display text of the backlink
-    original_link_target: str   # path as written in the file (relative to translation)
+    original_note_name: str     # wiki-link target pointing back to the original
     language: Language
 
 
-def _parse_original_header(lines: list[str]) -> tuple[OriginalHeader | None, int]:
+def _parse_original_header(
+    lines: list[str],
+    languages: list[Language],
+) -> tuple[OriginalHeader | None, int]:
     """
     If the first line looks like a language-link bar, parse it.
     Returns (header_or_None, content_start_index).
+
+    Expected format (with one leading space):
+      [[Mi Nota-es|español]] | [[我的笔记-zh|中文]]
+
+    The display text of each wiki-link is matched against configured language
+    names (case-insensitive) to determine which language it corresponds to.
+    Falls back to extracting a lang code from the last dash-segment of the
+    note name if the display text doesn't match any configured language.
     """
     if not lines:
         return None, 0
@@ -91,22 +90,28 @@ def _parse_original_header(lines: list[str]) -> tuple[OriginalHeader | None, int
         return None, 0
 
     first = raw.strip()
-    links = LINK_RE.findall(first)
-    if not links:
+    wiki_links = WIKI_LINK_RE.findall(first)  # [(note_name, display), ...]
+    if not wiki_links:
         return None, 0
 
-    # Line must contain ONLY links and separators (|, spaces)
-    cleaned = LINK_RE.sub("", first).replace("|", "").strip()
+    # Line must contain ONLY wiki-links and separators (|, spaces)
+    cleaned = WIKI_LINK_RE.sub("", first).replace("|", "").strip()
     if cleaned:
         return None, 0
 
-    language_links: dict[str, str] = {}
-    for _text, target in links:
-        stem = Path(target).stem          # e.g. "memory-a1b2c3d4-es"
-        parts = stem.rsplit("-", 1)
-        if len(parts) == 2:
-            lang_code = parts[-1]
-            language_links[lang_code] = target
+    lang_by_name = {lang.name.lower(): lang for lang in languages}
+    language_links: dict[str, str] = {}  # lang_code -> note_name
+    for note_name, display in wiki_links:
+        note_name = note_name.strip()
+        display = display.strip()
+        lang = lang_by_name.get(display.lower())
+        if lang is not None:
+            language_links[lang.code] = note_name
+        else:
+            # Fallback: extract lang code from last dash-segment of note name
+            parts = note_name.rsplit("-", 1)
+            if len(parts) == 2 and parts[-1] not in language_links:
+                language_links[parts[-1]] = note_name
 
     content_start = 2 if (len(lines) > 1 and lines[1].strip() == "") else 1
     return OriginalHeader(language_links=language_links), content_start
@@ -119,6 +124,9 @@ def _parse_translation_header(
     """
     If the first line matches a known 'translated from' phrase, parse it.
     Returns (header_or_None, content_start_index).
+
+    Expected format:
+      Traducido de: [[Original Note Name]]
     """
     if not lines:
         return None, 0
@@ -129,14 +137,13 @@ def _parse_translation_header(
         phrase = lang.translated_from
         if not first.lower().startswith(phrase.lower()):
             continue
-        links = LINK_RE.findall(first)
-        if not links:
+        wiki_links = WIKI_LINK_RE.findall(first)
+        if not wiki_links:
             continue
-        link_text, link_target = links[0]
+        note_name, _display = wiki_links[0]
         header = TranslationHeader(
             translated_from_phrase=phrase,
-            original_link_text=link_text,
-            original_link_target=link_target,
+            original_note_name=note_name.strip(),
             language=lang,
         )
         content_start = 2 if (len(lines) > 1 and lines[1].strip() == "") else 1
@@ -163,21 +170,21 @@ class VaultFile:
     def content_lines(self) -> list[str]:
         return self.lines[self.content_start:]
 
-    def links_on_line(self, content_line_index: int) -> list[tuple[str, str]]:
-        """Return (text, target) pairs for all links on a content line."""
-        line = self.content_lines[content_line_index]
-        return LINK_RE.findall(line)
-
     def all_internal_links(self) -> list[tuple[int, str, str]]:
         """
-        Return (content_line_index, text, target) for every internal link
-        in the content (skips http/https links).
+        Return (content_line_index, display_text, target) for every internal
+        link in the content.
+
+        For markdown links [text](target): skips http/https targets.
+        For wiki-links [[note_name|display]]: target is the note name.
         """
         results = []
         for i, line in enumerate(self.content_lines):
             for text, target in LINK_RE.findall(line):
                 if not target.startswith("http://") and not target.startswith("https://"):
                     results.append((i, text, target))
+            for note_name, display in WIKI_LINK_RE.findall(line):
+                results.append((i, display or note_name, note_name.strip()))
         return results
 
 
@@ -217,7 +224,7 @@ def scan_vault(config: TonguesConfig) -> list[VaultFile]:
                 content_start=cs,
             ))
         else:
-            header, cs = _parse_original_header(lines)
+            header, cs = _parse_original_header(lines, config.languages)
             vault_files.append(VaultFile(
                 path=md_path,
                 rel_path=rel,
@@ -236,3 +243,43 @@ def build_translation_index(
 ) -> dict[Path, VaultFile]:
     """Map absolute path -> VaultFile for quick lookup."""
     return {f.path.resolve(): f for f in vault_files}
+
+
+def declared_translation_path(
+    config: TonguesConfig, original: VaultFile, lang: Language
+) -> Path | None:
+    """
+    Return the absolute path where a translation lives or should live, or None
+    if the original's header doesn't declare a translation for this language.
+
+    The path is: {translations_folder}/{note_name}.md, where note_name is the
+    wiki-link target from the original's language-link header.
+
+    Returns None when no header entry exists — the translation is "unmapped".
+    """
+    if original.header is not None:
+        note_name = original.header.language_links.get(lang.code)
+        if note_name is not None:
+            return config.vault_root / config.translations_folder / f"{note_name}.md"
+    return None
+
+
+def find_translation_collisions(
+    config: TonguesConfig, originals: list[VaultFile]
+) -> list[tuple[Language, Path, list[VaultFile]]]:
+    """
+    Return (language, path, [originals]) triples where two or more originals
+    declare the same translation path. Each triple is a naming conflict that
+    must be resolved by giving at least one translation a different note name.
+    """
+    result = []
+    for lang in config.languages:
+        by_path: dict[Path, list[VaultFile]] = defaultdict(list)
+        for orig in originals:
+            path = declared_translation_path(config, orig, lang)
+            if path is not None:
+                by_path[path.resolve()].append(orig)
+        for path, files in by_path.items():
+            if len(files) > 1:
+                result.append((lang, path, files))
+    return result
