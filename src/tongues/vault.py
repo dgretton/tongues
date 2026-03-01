@@ -115,8 +115,9 @@ def _parse_original_header(
             if len(parts) == 2 and parts[-1] not in language_links:
                 language_links[parts[-1]] = note_name
 
-    content_start = 2 if (len(lines) > 1 and lines[1].strip() == "") else 1
-    return OriginalHeader(language_links=language_links), content_start
+    if len(lines) < 2 or lines[1].strip() != "":
+        return None, 0
+    return OriginalHeader(language_links=language_links), 2
 
 
 def _parse_translation_header(
@@ -148,8 +149,9 @@ def _parse_translation_header(
             original_note_name=note_name.strip(),
             language=lang,
         )
-        content_start = 2 if (len(lines) > 1 and lines[1].strip() == "") else 1
-        return header, content_start
+        if len(lines) < 2 or lines[1].strip() != "":
+            return None, 0
+        return header, 2
 
     return None, 0
 

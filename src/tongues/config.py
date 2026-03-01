@@ -61,8 +61,9 @@ each one simply needs a translation into every other configured language.
 ### Original file header (add incrementally as translations are created)
 
 Each time you create a translation, add a wiki-link on line 1 of the original.
-Use `•` as separator and bookend. Create the line if absent, or insert the new
-link before the trailing `•` if the line already exists:
+Use `•` as separator and bookend. The blank line after the header is required.
+Create the line if absent, or insert the new link before the trailing `•` if
+the line already exists:
 
 ```
 • [[Mi Título de Nota|español]] • [[我的笔记标题|中文]] •
