@@ -22,6 +22,7 @@ from .vault import (
     scan_vault,
     declared_translation_path,
     build_translation_index,
+    is_ignored,
     WIKI_LINK_RE,
 )
 from .status import compute_status, VaultStatus, TranslationRecord
@@ -82,6 +83,19 @@ def _resolve_original(config: TonguesConfig, file_arg: str) -> VaultFile:
             target = (config.vault_root / target).resolve()
     else:
         target = target.resolve()
+
+    # Check ignore patterns before scanning — gives a clear message instead of "not found"
+    if target.exists() and config.ignore_patterns:
+        try:
+            rel = target.relative_to(config.vault_root)
+            if is_ignored(rel, config.ignore_patterns):
+                console.print(
+                    f"[dim]{file_arg} is excluded from translation tracking "
+                    f"(matches an ignore pattern in tongues.md).[/dim]"
+                )
+                sys.exit(0)
+        except ValueError:
+            pass  # target is not under vault root
 
     all_files = scan_vault(config)
     for f in all_files:

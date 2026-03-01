@@ -8,7 +8,7 @@ frontmatter, so it's Obsidian-syncable and human-readable.
 from __future__ import annotations
 
 import yaml
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 CONFIG_FILENAME = "tongues.md"
@@ -24,6 +24,10 @@ tongues:
       name: 中文
       translated_from: "译自"
   translations_folder: .translations
+  # ignore:
+  #   - "Daily Notes/**"
+  #   - "Templates/**"
+  #   - "Archive/**"
 ---
 
 # Tongues — Translation Configuration
@@ -43,14 +47,16 @@ each one simply needs a translation into every other configured language.
 
 ## How translations work
 
-- **Originals** are any `.md` files outside the translations folder.
+- **Originals** are any `.md` files outside the translations folder (and not ignored).
 - **Translated files** live flat inside the translations folder (default: `.translations/`).
   They are found via links, not the file tree — the whole folder can be hidden or deleted cleanly.
 - Translation note names are chosen by the translator — they should be the
-  translated title of the document in the target language. Conventionally add a
-  `-{lang-code}` suffix (e.g. `Mi Nota-es`) to keep languages distinguishable.
-- Note names must be unique across all originals for the same language.
-  `tongues status` reports naming conflicts.
+  translated title of the document in the target language.
+- Note names must be unique within the translations folder (across all originals
+  for the same language). `tongues status` reports naming conflicts.
+- **Ignored files** are excluded from translation tracking entirely. Add glob patterns
+  under `ignore:` in the YAML frontmatter above. Patterns are matched against the
+  path relative to the vault root (e.g. `Daily Notes/**`, `Templates/**`, `scratch.md`).
 
 ### Original file header (add incrementally as translations are created)
 
@@ -115,8 +121,9 @@ class Language:
 class TonguesConfig:
     vault_root: Path
     config_path: Path
-    languages: list[Language]       # languages to translate into
-    translations_folder: str        # relative to vault_root
+    languages: list[Language]           # languages to translate into
+    translations_folder: str            # relative to vault_root
+    ignore_patterns: list[str] = field(default_factory=list)  # glob patterns to skip
 
 
 def find_config(start: Path) -> Path | None:
@@ -164,6 +171,7 @@ def parse_config(config_path: Path) -> TonguesConfig:
         config_path=config_path,
         languages=languages,
         translations_folder=cfg.get("translations_folder", ".translations"),
+        ignore_patterns=cfg.get("ignore", []),
     )
 
 

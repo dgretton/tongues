@@ -21,6 +21,7 @@ fallback; a translation is "unmapped" until the original's header declares it.
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -192,6 +193,23 @@ class VaultFile:
 # Vault scanning
 # ---------------------------------------------------------------------------
 
+def is_ignored(rel_path: Path, patterns: list[str]) -> bool:
+    """
+    Return True if rel_path matches any ignore pattern.
+
+    Patterns are matched against the POSIX string of the path relative to the
+    vault root using fnmatch, where * matches across directory separators.
+    Common examples:
+      "Daily Notes/**"  — excludes everything under Daily Notes/
+      "Templates/**"    — excludes everything under Templates/
+      "scratch.md"      — excludes a specific file at any depth
+    """
+    if not patterns:
+        return False
+    path_str = rel_path.as_posix()
+    return any(fnmatch.fnmatch(path_str, pattern) for pattern in patterns)
+
+
 def scan_vault(config: TonguesConfig) -> list[VaultFile]:
     """
     Walk the entire vault and classify every .md file as original or translation.
@@ -224,6 +242,8 @@ def scan_vault(config: TonguesConfig) -> list[VaultFile]:
                 content_start=cs,
             ))
         else:
+            if is_ignored(rel, config.ignore_patterns):
+                continue
             header, cs = _parse_original_header(lines, config.languages)
             vault_files.append(VaultFile(
                 path=md_path,
