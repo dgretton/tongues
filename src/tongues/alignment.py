@@ -234,6 +234,8 @@ def check_link_universe(
     for i, line in enumerate(translation.content_lines):
         for note_name, display in WIKI_LINK_RE.findall(line):
             note_name = note_name.strip()
+            if "://" in note_name:
+                continue  # external protocol link (chatgpt://, obsidian://, etc.) — not a vault note
             linked = by_stem.get(note_name)
 
             if linked is None:

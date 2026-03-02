@@ -94,7 +94,7 @@ def _resolve_original(config: TonguesConfig, file_arg: str) -> VaultFile:
             if is_ignored(rel, config.ignore_patterns):
                 console.print(
                     f"[dim]{file_arg} is excluded from translation tracking "
-                    f"(matches an ignore pattern in tongues.md).[/dim]"
+                    f"(matches an ignore pattern in {CONFIG_FILENAME}).[/dim]"
                 )
                 sys.exit(0)
         except ValueError:
@@ -204,7 +204,7 @@ def main() -> None:
 @main.command()
 @click.option("--force", is_flag=True, help="Overwrite existing config.")
 def init(force: bool) -> None:
-    """Create a tongues.md config file in the current directory."""
+    """Create a tongues-config.md config file in the current directory."""
     config_path = Path.cwd() / CONFIG_FILENAME
     if config_path.exists() and not force:
         console.print(

@@ -11,7 +11,7 @@ import yaml
 from dataclasses import dataclass, field
 from pathlib import Path
 
-CONFIG_FILENAME = "tongues.md"
+CONFIG_FILENAME = "tongues-config.md"
 
 DEFAULT_CONFIG_CONTENT = """\
 ---
@@ -147,21 +147,33 @@ class TonguesConfig:
     ignore_patterns: list[str] = field(default_factory=list)  # glob patterns to skip
 
 
-def find_config(start: Path) -> Path | None:
-    """Walk up from start looking for tongues.md."""
+def find_config(start: Path) -> tuple[Path, Path] | None:
+    """Walk up from start searching each ancestor's subtree for tongues-config.md.
+
+    Returns (vault_root, config_path) where vault_root is the ancestor directory
+    that contains the config file (directly or in a subdirectory).
+
+    Raises ValueError if multiple config files are found under the same ancestor.
+    """
     current = start.resolve()
     while True:
-        candidate = current / CONFIG_FILENAME
-        if candidate.exists():
-            return candidate
+        matches = sorted(current.rglob(CONFIG_FILENAME))
+        if matches:
+            if len(matches) > 1:
+                rel_paths = "\n  ".join(str(m.relative_to(current)) for m in matches)
+                raise ValueError(
+                    f"Multiple {CONFIG_FILENAME} files found under {current}:\n  {rel_paths}\n"
+                    "Remove all but one before using tongues."
+                )
+            return current, matches[0]
         parent = current.parent
         if parent == current:
             return None
         current = parent
 
 
-def parse_config(config_path: Path) -> TonguesConfig:
-    """Parse a tongues.md file and return a TonguesConfig."""
+def parse_config(vault_root: Path, config_path: Path) -> TonguesConfig:
+    """Parse a tongues-config.md file and return a TonguesConfig."""
     text = config_path.read_text(encoding="utf-8")
 
     if not text.startswith("---"):
@@ -188,7 +200,7 @@ def parse_config(config_path: Path) -> TonguesConfig:
         ))
 
     return TonguesConfig(
-        vault_root=config_path.parent,
+        vault_root=vault_root,
         config_path=config_path,
         languages=languages,
         translations_folder=cfg.get("translations_folder", ".translations"),
@@ -197,13 +209,14 @@ def parse_config(config_path: Path) -> TonguesConfig:
 
 
 def load_config(start: Path | None = None) -> TonguesConfig:
-    """Find and parse the nearest tongues.md, raising clearly if absent."""
+    """Find and parse the nearest tongues-config.md, raising clearly if absent."""
     if start is None:
         start = Path.cwd()
-    config_path = find_config(start)
-    if config_path is None:
+    result = find_config(start)
+    if result is None:
         raise FileNotFoundError(
             f"No {CONFIG_FILENAME} found in {start} or any parent directory.\n"
             "Run 'tongues init' to create one."
         )
-    return parse_config(config_path)
+    vault_root, config_path = result
+    return parse_config(vault_root, config_path)
