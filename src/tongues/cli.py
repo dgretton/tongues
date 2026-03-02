@@ -656,7 +656,7 @@ def inspect(file: str, lang: str, max_issues: int | None) -> None:
     if result.is_valid:
         console.print("👅 [bold green]✓ Alignment is valid.[/bold green]")
         console.print(f"  {result.original_content_lines} content lines, all structure checks pass.")
-        _print_link_universe_reminder(config, original, all_files)
+        _print_link_universe_reminder(config, original, all_files, show_panel=False)
         return
 
     # Line count
@@ -762,4 +762,53 @@ def languages() -> None:
         )
     console.print(
         f"\n[dim]Translations folder: {config.translations_folder}[/dim]"
+    )
+
+
+# ---------------------------------------------------------------------------
+# tongues stale-standins
+# ---------------------------------------------------------------------------
+
+@main.command("stale-standins")
+def stale_standins() -> None:
+    """List all ⍰ stand-in links where the target version now exists.
+
+    Stand-in links ([[Original|⍰ display]]) are placeholders used when the
+    same-language version of a linked document doesn't exist yet. Once that
+    version is created, the stand-in should be updated to point to it.
+    This command finds every stand-in across all language versions that can
+    now be resolved to an actual same-language link.
+    """
+    config = _load_or_exit()
+    all_files = scan_vault(config)
+
+    results: list[tuple[VaultFile, list]] = []
+    for f in all_files:
+        if not f.is_translation:
+            continue
+        issues = check_link_universe(f, all_files, config)
+        stale = [i for i in issues if i.issue_type == LinkUniverseIssue.STALE_STANDBY]
+        if stale:
+            results.append((f, stale))
+
+    console.print()
+    if not results:
+        console.print("👅 [green]No stale stand-in links found.[/green]")
+        console.print()
+        return
+
+    total = sum(len(issues) for _, issues in results)
+    console.print(f"👅 [bold]Stale stand-in links[/bold] — same-language versions now exist for these:")
+    console.print()
+
+    for f, issues in results:
+        lang_tag = f"[{f.header.language.code}] " if isinstance(f.header, TranslationHeader) else ""
+        console.rule(f"[bold]{lang_tag}{f.rel_path}[/bold]", style="dim")
+        for issue in issues:
+            console.print(f"  Line {issue.line_num}: {issue.describe()}")
+
+    console.print()
+    console.print(
+        f"[dim]{total} stale stand-in(s) across {len(results)} file(s). "
+        "Update each link shown above.[/dim]"
     )

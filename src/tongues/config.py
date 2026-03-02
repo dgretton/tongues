@@ -45,6 +45,7 @@ copy exists in each of the other configured languages.
 **Check a specific file**: `tongues check <path/to/file.md>`
 **Inspect alignment detail**: `tongues inspect <path/to/file.md> <lang-code>`
 **Get translation file path**: `tongues where <path/to/file.md> <lang-code>`
+**Find updatable stand-ins**: `tongues stale-standins`
 
 ## How translations work
 
