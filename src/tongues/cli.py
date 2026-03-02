@@ -242,7 +242,13 @@ def init(force: bool) -> None:
 @main.command()
 @click.option("--all", "show_all", is_flag=True, help="Show OK files too.")
 def status(show_all: bool) -> None:
-    """Show overall translation completion and list files that need work."""
+    """Show language coverage and list documents that need work.
+
+    Coverage % = (documents + valid language versions) / (documents × languages).
+    Each document implicitly fills one slot in the matrix as its own language version;
+    every other slot must be filled by a file in the translations folder. Coverage
+    reaches 100% when every document has a valid version in every configured language.
+    """
     config = _load_or_exit()
     vs = compute_status(config)
 

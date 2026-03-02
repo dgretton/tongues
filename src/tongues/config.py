@@ -41,7 +41,7 @@ copy exists in each of the other configured languages.
 
 **Install** (if not present): `uv tool install git+https://github.com/dgretton/tongues.git`
 **Always update before use**: `uv tool upgrade tongues`
-**Check status**: `tongues status`
+**Check status**: `tongues status`  — coverage % = (documents + valid versions) / (documents × languages); starts at 1/L and reaches 100% when every document has a valid version in every configured language
 **Check a specific file**: `tongues check <path/to/file.md>`
 **Inspect alignment detail**: `tongues inspect <path/to/file.md> <lang-code>`
 **Get translation file path**: `tongues where <path/to/file.md> <lang-code>`
