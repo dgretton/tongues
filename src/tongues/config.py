@@ -13,6 +13,10 @@ from pathlib import Path
 
 CONFIG_FILENAME = "tongues-config.md"
 
+# Increment this whenever DEFAULT_CONFIG_CONTENT changes significantly.
+# tongues status warns when a vault's config file lacks the current marker.
+DOCS_VERSION = 1
+
 DEFAULT_CONFIG_CONTENT = """\
 ---
 tongues:
@@ -30,6 +34,7 @@ tongues:
   #   - "Archive/**"
 ---
 
+<!-- tongues-docs: 1 -->
 # Tongues — Translation Configuration
 
 This vault uses **tongues** to ensure every document exists in every configured
@@ -46,6 +51,7 @@ copy exists in each of the other configured languages.
 **Inspect alignment detail**: `tongues inspect <path/to/file.md> <lang-code>`
 **Get translation file path**: `tongues where <path/to/file.md> <lang-code>`
 **Find updatable stand-ins**: `tongues stale-standins`
+**Refresh docs after upgrade**: `tongues upgrade-docs`
 
 ## How translations work
 
@@ -224,3 +230,47 @@ def load_config(start: Path | None = None) -> TonguesConfig:
         )
     vault_root, config_path = result
     return parse_config(vault_root, config_path)
+
+
+# ---------------------------------------------------------------------------
+# Docs versioning and upgrade
+# ---------------------------------------------------------------------------
+
+def _split_config_text(text: str) -> tuple[str, str] | None:
+    """Split config file text into (frontmatter, docs_body) or None if malformed.
+
+    frontmatter includes both --- delimiters and the trailing newline.
+    docs_body is everything after.
+    """
+    if not text.startswith("---"):
+        return None
+    try:
+        end = text.index("---", 3)
+    except ValueError:
+        return None
+    fm_end = end + 3
+    if fm_end < len(text) and text[fm_end] == "\n":
+        fm_end += 1
+    return text[:fm_end], text[fm_end:]
+
+
+def docs_are_current(config_path: Path) -> bool:
+    """Return True if the config file contains the current docs version marker."""
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return True  # unreadable — don't add noise
+    return f"<!-- tongues-docs: {DOCS_VERSION} -->" in text
+
+
+def upgrade_docs(config_path: Path) -> None:
+    """Rewrite the markdown body of a tongues-config.md, preserving the YAML frontmatter."""
+    text = config_path.read_text(encoding="utf-8")
+    result = _split_config_text(text)
+    if result is None:
+        raise ValueError(
+            f"{config_path} does not have valid YAML frontmatter — cannot upgrade docs."
+        )
+    frontmatter, _ = result
+    _, new_docs = _split_config_text(DEFAULT_CONFIG_CONTENT)  # type: ignore[misc]
+    config_path.write_text(frontmatter + new_docs, encoding="utf-8")

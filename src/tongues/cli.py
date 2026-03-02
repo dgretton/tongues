@@ -16,7 +16,10 @@ from rich.table import Table
 from rich import box
 from rich.panel import Panel
 
-from .config import load_config, TonguesConfig, Language, DEFAULT_CONFIG_CONTENT, CONFIG_FILENAME
+from .config import (
+    load_config, TonguesConfig, Language, DEFAULT_CONFIG_CONTENT, CONFIG_FILENAME,
+    docs_are_current, upgrade_docs,
+)
 from .vault import (
     VaultFile,
     TranslationHeader,
@@ -250,6 +253,14 @@ def status(show_all: bool) -> None:
     reaches 100% when every document has a valid version in every configured language.
     """
     config = _load_or_exit()
+
+    if not docs_are_current(config.config_path):
+        console.print(
+            "[yellow]⚠ Config docs are out of date. "
+            "Run: tongues upgrade-docs[/yellow]"
+        )
+        console.print()
+
     vs = compute_status(config)
 
     # Summary bar
@@ -763,6 +774,28 @@ def languages() -> None:
     console.print(
         f"\n[dim]Translations folder: {config.translations_folder}[/dim]"
     )
+
+
+# ---------------------------------------------------------------------------
+# tongues upgrade-docs
+# ---------------------------------------------------------------------------
+
+@main.command("upgrade-docs")
+def upgrade_docs_cmd() -> None:
+    """Refresh the documentation in tongues-config.md without changing settings.
+
+    Rewrites the markdown body of the config file to the current version
+    while preserving the YAML frontmatter (languages, ignore patterns, etc.).
+    Run this after upgrading tongues to keep command references and guidance
+    up to date for anyone reading the config file, including AI agents.
+    """
+    config = _load_or_exit()
+    try:
+        upgrade_docs(config.config_path)
+    except ValueError as e:
+        err_console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+    console.print(f"👅 [green]Docs refreshed:[/green] {config.config_path}")
 
 
 # ---------------------------------------------------------------------------
