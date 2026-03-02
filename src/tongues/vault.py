@@ -155,7 +155,9 @@ def _parse_original_header(
 
     if pos + 1 >= len(lines) or lines[pos + 1].strip() != "":
         return None, pos if fm_end > 0 else 0
-    return OriginalHeader(language_links=language_links), pos + 2
+    if pos + 2 >= len(lines) or lines[pos + 2].strip() != "---":
+        return None, pos if fm_end > 0 else 0
+    return OriginalHeader(language_links=language_links), pos + 3
 
 
 def _parse_translation_header(
@@ -195,7 +197,9 @@ def _parse_translation_header(
         )
         if len(lines) < 2 or lines[1].strip() != "":
             return None, 0
-        return header, 2
+        if len(lines) < 3 or lines[2].strip() != "---":
+            return None, 0
+        return header, 3
 
     return None, 0
 

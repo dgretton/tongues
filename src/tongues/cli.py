@@ -410,10 +410,12 @@ def check(file: str) -> None:
 
         if not exp_path.exists():
             console.print(f"  [bold red]MISSING[/bold red]  {exp_rel}")
-            console.print(f"  Create this file. Line 1:")
+            console.print(f"  Create this file with this 3-line header block:")
             console.print(f"    [bold]{TRANSLATION_MARKER} {lang.translated_from}: [[{original.path.stem}]][/bold]")
+            console.print(f"    [bold](blank line)[/bold]")
+            console.print(f"    [bold]---[/bold]")
             console.print(
-                f"  Then a blank line, then {len(original.content_lines)} lines of body content "
+                f"  Then {len(original.content_lines)} lines of body content "
                 f"(matching the original's structure)."
             )
             console.print(
@@ -529,11 +531,13 @@ def inspect(file: str, lang: str) -> None:
         console.print(f"[bold red]Translation does not exist.[/bold red]")
         console.print(f"Expected at: {exp_rel}")
         console.print(
-            f"\nCreate it with this header on line 1:\n"
-            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
+            f"\nCreate it with this 3-line header block:\n"
+            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]\n"
+            f"  [bold](blank line)[/bold]\n"
+            f"  [bold]---[/bold]"
         )
         console.print(
-            f"\nThen a blank line, then {len(original.content_lines)} lines of translated content."
+            f"\nThen {len(original.content_lines)} lines of translated content."
         )
         all_files = scan_vault(config)
         _print_link_universe_reminder(config, original, all_files)
@@ -546,8 +550,10 @@ def inspect(file: str, lang: str) -> None:
     if trans_file is None or trans_file.header is None:
         console.print(f"[bold red]Translation header missing.[/bold red]")
         console.print(
-            f"Line 1 of {exp_rel} must be:\n"
-            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
+            f"Header block of {exp_rel} must be:\n"
+            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]\n"
+            f"  [bold](blank line)[/bold]\n"
+            f"  [bold]---[/bold]"
         )
         _print_link_universe_reminder(config, original, all_files)
         return
