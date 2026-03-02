@@ -254,13 +254,13 @@ def status(show_all: bool) -> None:
     n_orig = len(vs.originals)
     n_lang = len(config.languages)
     console.print(
-        f"👅 [bold]Translation status:[/bold]  "
+        f"👅 [bold]Language coverage:[/bold]  "
         f"[{pct_style}]{pct:.1f}%[/{pct_style}]  "
-        f"[dim]({ok_translations}/{n_orig * n_lang} translations × {n_lang} languages)[/dim]"
+        f"[dim]({vs.completed} of {vs.total_expected} language versions exist)[/dim]"
     )
     console.print(
         f"Vault: [dim]{config.vault_root}[/dim]  "
-        f"Originals: {n_orig}  "
+        f"Documents: {n_orig}  "
         f"Languages: {', '.join(l.name for l in config.languages)}"
     )
     console.print()
@@ -279,13 +279,13 @@ def status(show_all: bool) -> None:
         console.print()
 
     if vs.total_expected == 0:
-        console.print("[dim]No originals found. Create some .md files outside the translations folder.[/dim]")
+        console.print("[dim]No documents found. Create some .md files outside the translations folder.[/dim]")
         return
 
     needs_work = vs.needs_work()
 
     if not needs_work:
-        console.print("👅 [bold green]✓ All translations are complete and valid.[/bold green]")
+        console.print("👅 [bold green]✓ All language versions are complete and valid.[/bold green]")
         return
 
     # Group by original
@@ -305,10 +305,10 @@ def status(show_all: bool) -> None:
             if r.status == "unmapped":
                 console.print(f"  [{style}]{label:12}[/{style}] [{r.language.code}]")
                 console.print(
-                    f"    [dim]No {r.language.name} link in header — "
-                    f"add one when you create the translation: "
-                    f"• [[translated-title|{r.language.name}]] •  "
-                    f"(line 1 of translation: {TRANSLATION_MARKER} {r.language.translated_from}: [[original-note-name]])[/dim]"
+                    f"    [dim]No {r.language.name} version linked in header — "
+                    f"add one when you create it: "
+                    f"• [[{r.language.name}-title|{r.language.name}]] •  "
+                    f"(line 1 of the {r.language.name} version: {TRANSLATION_MARKER} {r.language.translated_from}: [[original-note-name]])[/dim]"
                 )
                 continue
 
@@ -322,7 +322,7 @@ def status(show_all: bool) -> None:
 
             if r.status == "missing":
                 console.print(
-                    f"    [dim]Create this file. Line 1:[/dim] "
+                    f"    [dim]Create the {r.language.name} version. Line 1:[/dim] "
                     f"{r.language.translated_from}: [[{orig_rel.stem}]]"
                 )
             elif r.status == "missing_header":
@@ -358,7 +358,7 @@ def status(show_all: bool) -> None:
 
     console.print()
     console.print(
-        f"[dim]{len(needs_work)} pair(s) need attention. "
+        f"[dim]{len(needs_work)} language version(s) need attention. "
         "Run [bold]tongues check <file>[/bold] for per-file detail.[/dim]"
     )
 
@@ -452,7 +452,7 @@ def check(file: str, verbose: bool) -> None:
     else:
         console.print(
             f"  Header: [dim]none yet[/dim] — "
-            f"add a bullet link each time you create a translation: • [[title|lang]] •"
+            f"add a bullet link each time you create a language version: • [[title|lang]] •"
         )
     console.print()
 
@@ -463,7 +463,7 @@ def check(file: str, verbose: bool) -> None:
     ]
 
     if not declared:
-        console.print("[dim]No translations declared yet.[/dim]")
+        console.print("[dim]No other-language versions declared yet.[/dim]")
         _print_link_universe_reminder(config, original, all_files,
                                       show_panel=verbose, show_table=True)
         console.print()
@@ -480,17 +480,17 @@ def check(file: str, verbose: bool) -> None:
         if not exp_path.exists():
             any_missing = True
             console.print(f"  [bold red]MISSING[/bold red]  {exp_rel}")
-            console.print(f"  Create this file with this 3-line header block:")
+            console.print(f"  Create the {lang.name} version of this document with this 3-line header block:")
             console.print(f"    [bold]{TRANSLATION_MARKER} {lang.translated_from}: [[{original.path.stem}]][/bold]")
             console.print(f"    [bold](blank line)[/bold]")
             console.print(f"    [bold]---[/bold]")
             console.print(
                 f"  Then {len(original.content_lines)} lines of body content "
-                f"(matching the original's structure)."
+                f"structured identically to {original.path.stem}."
             )
             console.print(
-                f"  [dim]Internal links must point to same-language translations, or to originals "
-                f"as stand-ins with the {STANDBY_MARKER} marker: "
+                f"  [dim]Links must point to {lang.name} versions of linked documents, "
+                f"or to originals as stand-ins with the {STANDBY_MARKER} marker: "
                 f"[[original-note|{STANDBY_MARKER} display name]][/dim]"
             )
             continue
@@ -596,14 +596,14 @@ def inspect(file: str, lang: str, max_issues: int | None) -> None:
     if exp_path is None:
         console.print(f"👅 [bold]Inspecting:[/bold] {original.rel_path}  →  [{lang}] (no path declared)")
         console.print()
-        console.print(f"[bold red]No translation path declared for {lang_obj.name}.[/bold red]")
+        console.print(f"[bold red]No {lang_obj.name} version declared for this document.[/bold red]")
         console.print(
             f"Add a bullet link to line 1 of {original.rel_path}:\n"
-            f"  [bold]• [[translated-title|{lang_obj.name}]] •[/bold]"
+            f"  [bold]• [[{lang_obj.name}-title|{lang_obj.name}]] •[/bold]"
         )
         console.print(
-            f"Replace 'translated-title' with the actual translated title, "
-            f"then create the translation file with line 1:\n"
+            f"Replace '{lang_obj.name}-title' with the actual title in {lang_obj.name}, "
+            f"then create the {lang_obj.name} version with line 1:\n"
             f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
         )
         all_files = scan_vault(config)
@@ -615,7 +615,7 @@ def inspect(file: str, lang: str, max_issues: int | None) -> None:
     console.print()
 
     if not exp_path.exists():
-        console.print(f"[bold red]Translation does not exist.[/bold red]")
+        console.print(f"[bold red]The {lang_obj.name} version of this document does not exist yet.[/bold red]")
         console.print(f"Expected at: {exp_rel}")
         console.print(
             f"\nCreate it with this 3-line header block:\n"
@@ -752,7 +752,7 @@ def languages() -> None:
     for lang in config.languages:
         console.print(
             f"  [{lang.code}]  {lang.name}  "
-            f"[dim]translation header: \"{TRANSLATION_MARKER} {lang.translated_from}: [[original note name]]\"[/dim]"
+            f"[dim]version header: \"{TRANSLATION_MARKER} {lang.translated_from}: [[document note name]]\"[/dim]"
         )
     console.print(
         f"\n[dim]Translations folder: {config.translations_folder}[/dim]"

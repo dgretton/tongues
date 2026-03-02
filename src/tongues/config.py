@@ -32,9 +32,10 @@ tongues:
 
 # Tongues — Translation Configuration
 
-This vault uses **tongues** to coordinate translations into multiple languages.
-There is no "original language" — documents may be written in any language and
-each one simply needs a translation into every other configured language.
+This vault uses **tongues** to ensure every document exists in every configured
+language. There is no "source language" or "target language" — any document may
+be written in any language, and tongues tracks whether a structurally consistent
+copy exists in each of the other configured languages.
 
 ## For AI agents and terminal users
 
@@ -47,20 +48,22 @@ each one simply needs a translation into every other configured language.
 
 ## How translations work
 
-- **Originals** are any `.md` files outside the translations folder (and not ignored).
-- **Translated files** live flat inside the translations folder (default: `.translations/`).
+- **Documents** are any `.md` files outside the translations folder (and not ignored).
+  Each document is assumed to be written in some language and must eventually exist
+  in every configured language.
+- **Language versions** live flat inside the translations folder (default: `.translations/`).
   They are found via links, not the file tree — the whole folder can be hidden or deleted cleanly.
-- Translation note names are chosen by the translator — they should be the
-  translated title of the document in the target language.
-- Note names must be unique within the translations folder (across all originals
+- Language version filenames are chosen by whoever creates them — they should be the
+  title of the document in that language.
+- Names must be unique within the translations folder (across all documents
   for the same language). `tongues status` reports naming conflicts.
 - **Ignored files** are excluded from translation tracking entirely. Add glob patterns
   under `ignore:` in the YAML frontmatter above. Patterns are matched against the
   path relative to the vault root (e.g. `Daily Notes/**`, `Templates/**`, `scratch.md`).
 
-### Original file header (add incrementally as translations are created)
+### Document header (add incrementally as language versions are created)
 
-Each time you create a translation, add a wiki-link on line 1 of the original.
+Each time you create a language version, add a wiki-link on line 1 of the document.
 Use `•` as separator and bookend. A blank line and then `---` must follow the
 header (they render as a horizontal rule). Create the header block if absent,
 or insert the new link before the trailing `•` if the line already exists:
@@ -77,7 +80,7 @@ The wiki-link target (before `|`) is the note name Obsidian uses to find the
 translation. No path is needed — Obsidian resolves it by name. In rendered
 view this line reads simply: `• español • 中文 •`
 
-### Translation file header (required)
+### Language version header (required)
 
 Line 1 must be `※` followed by the `translated_from` phrase and a wiki-link to
 the original. A blank line and then `---` must follow.
@@ -90,13 +93,13 @@ the original. A blank line and then `---` must follow.
 ...
 ```
 
-## What counts as a valid translation
+## What makes a language version valid
 
 Line counts and structure are compared **excluding headers on both sides**.
-YAML frontmatter (`---...---`) at the top of an original is excluded and need
-not appear in the translation. The full 3-line header block on each side
+YAML frontmatter (`---...---`) at the top of a document is excluded and need
+not appear in the language version. The full 3-line header block on each side
 (header line + blank line + `---`) is stripped before any comparison.
-Only the body content is compared.
+Only the body content is compared. Trailing blank lines are ignored.
 
 1. Same number of body lines as the original (headers excluded on both sides).
 2. Heading levels match at every line position.
