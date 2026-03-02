@@ -185,7 +185,7 @@ def _print_link_universe_reminder(
 @click.version_option(package_name="tongues")
 def main() -> None:
     """
-    tongues — Obsidian vault translation coordinator.
+    👅 tongues — Obsidian vault translation coordinator.
 
     \b
     Quick start for AI agents:
@@ -214,7 +214,7 @@ def init(force: bool) -> None:
         sys.exit(1)
 
     config_path.write_text(DEFAULT_CONFIG_CONTENT, encoding="utf-8")
-    console.print(f"[green]Created[/green] {config_path}")
+    console.print(f"👅 [green]Created[/green] {config_path}")
     console.print(
         "Edit the YAML frontmatter to set your target languages, then run "
         "[bold]tongues status[/bold]."
@@ -240,7 +240,7 @@ def status(show_all: bool) -> None:
     n_orig = len(vs.originals)
     n_lang = len(config.languages)
     console.print(
-        f"[bold]Translation status:[/bold]  "
+        f"👅 [bold]Translation status:[/bold]  "
         f"[{pct_style}]{pct:.1f}%[/{pct_style}]  "
         f"[dim]({ok_translations}/{n_orig * n_lang} translations × {n_lang} languages)[/dim]"
     )
@@ -271,7 +271,7 @@ def status(show_all: bool) -> None:
     needs_work = vs.needs_work()
 
     if not needs_work:
-        console.print("[bold green]✓ All translations are complete and valid.[/bold green]")
+        console.print("👅 [bold green]✓ All translations are complete and valid.[/bold green]")
         return
 
     # Group by original
@@ -367,7 +367,7 @@ def check(file: str) -> None:
     all_files = scan_vault(config)
 
     console.print()
-    console.print(f"[bold]Checking:[/bold] {original.rel_path}")
+    console.print(f"👅 [bold]Checking:[/bold] {original.rel_path}")
 
     # Header status
     n_configured = len(config.languages)
@@ -507,7 +507,7 @@ def inspect(file: str, lang: str) -> None:
     console.print()
 
     if exp_path is None:
-        console.print(f"[bold]Inspecting:[/bold] {original.rel_path}  →  [{lang}] (no path declared)")
+        console.print(f"👅 [bold]Inspecting:[/bold] {original.rel_path}  →  [{lang}] (no path declared)")
         console.print()
         console.print(f"[bold red]No translation path declared for {lang_obj.name}.[/bold red]")
         console.print(
@@ -524,7 +524,7 @@ def inspect(file: str, lang: str) -> None:
         return
 
     exp_rel = exp_path.relative_to(config.vault_root)
-    console.print(f"[bold]Inspecting:[/bold] {original.rel_path}  →  [{lang}] {exp_rel}")
+    console.print(f"👅 [bold]Inspecting:[/bold] {original.rel_path}  →  [{lang}] {exp_rel}")
     console.print()
 
     if not exp_path.exists():
@@ -561,7 +561,7 @@ def inspect(file: str, lang: str) -> None:
     result = check_alignment(original, trans_file)
 
     if result.is_valid:
-        console.print("[bold green]✓ Alignment is valid.[/bold green]")
+        console.print("👅 [bold green]✓ Alignment is valid.[/bold green]")
         console.print(f"  {result.original_content_lines} content lines, all structure checks pass.")
         _print_link_universe_reminder(config, original, all_files)
         return
@@ -654,7 +654,7 @@ def languages() -> None:
     config = _load_or_exit()
 
     console.print()
-    console.print("[bold]Configured languages:[/bold]")
+    console.print("👅 [bold]Configured languages:[/bold]")
     for lang in config.languages:
         console.print(
             f"  [{lang.code}]  {lang.name}  "
