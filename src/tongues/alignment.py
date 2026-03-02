@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from .config import TonguesConfig
 from .vault import (
-    VaultFile, TranslationHeader,
+    VaultFile, TranslationHeader, OriginalHeader,
     HEADING_RE, BULLET_RE, CHECKBOX_RE, LINK_RE, WIKI_LINK_RE,
     STANDBY_MARKER,
 )
@@ -183,11 +183,13 @@ class LinkUniverseIssue:
     target: str         # note name as written in the wiki-link
     display: str        # display text as written (may be empty)
     issue_type: str
-    found_lang: str | None = None   # for WRONG_LANGUAGE: the language code found
+    found_lang: str | None = None       # for WRONG_LANGUAGE: the language code found
+    suggested_target: str | None = None # for STALE_STANDBY: note name of the now-existing translation
 
     BROKEN = "broken_link"              # target not found in vault
     WRONG_LANGUAGE = "wrong_language"   # target is a translation in a different language
     MISSING_STANDBY = "missing_standby" # target is an original but ⍰ is absent from display
+    STALE_STANDBY = "stale_standby"     # ⍰ stand-in link but same-language translation now exists
 
     def describe(self) -> str:
         t = self.issue_type
@@ -208,6 +210,14 @@ class LinkUniverseIssue:
                 f"[[{self.target}]] links to an original without the {STANDBY_MARKER} stand-in marker — "
                 f"use [[{self.target}|{STANDBY_MARKER} {display}]]"
             )
+        if t == self.STALE_STANDBY:
+            new_target = self.suggested_target or "?"
+            # Strip the ⍰ prefix from display text to get a clean display name
+            clean_display = self.display.replace(STANDBY_MARKER, "").strip()
+            return (
+                f"[[{self.target}]] is a stale stand-in — a translation now exists: "
+                f"update to [[{new_target}|{clean_display}]]"
+            )
         return f"{t}: [[{self.target}]]"
 
 
@@ -220,9 +230,10 @@ def check_link_universe(
     Validate that every wiki-link in a translation's content follows the
     link universe convention:
       - Points to a translation in the SAME language, OR
-      - Points to an original as a stand-in, with ⍰ in the display text.
-    Anything else (broken link, wrong-language translation, original without ⍰)
-    is an issue that makes the translation invalid.
+      - Points to an original as a stand-in (⍰ in display), but only while
+        no same-language translation of that original exists yet.
+    Issues: broken link, wrong-language translation, original without ⍰,
+    or stale ⍰ stand-in where a same-language translation now exists.
     """
     issues = []
     if not isinstance(translation.header, TranslationHeader):
@@ -253,11 +264,22 @@ def check_link_universe(
                     ))
                 # same language (or unrecognised header) → OK
             else:
-                # Points to an original — stand-in, must have ⍰ in display
+                # Points to an original — must be a stand-in with ⍰ in display
                 if STANDBY_MARKER not in display:
                     issues.append(LinkUniverseIssue(
                         line_num=i + 1, target=note_name, display=display,
                         issue_type=LinkUniverseIssue.MISSING_STANDBY,
                     ))
+                else:
+                    # Valid stand-in for now — but check if a same-language
+                    # translation has since been created, making it stale
+                    if isinstance(linked.header, OriginalHeader):
+                        trans_note_name = linked.header.language_links.get(this_lang_code)
+                        if trans_note_name is not None and by_stem.get(trans_note_name) is not None:
+                            issues.append(LinkUniverseIssue(
+                                line_num=i + 1, target=note_name, display=display,
+                                issue_type=LinkUniverseIssue.STALE_STANDBY,
+                                suggested_target=trans_note_name,
+                            ))
 
     return issues
