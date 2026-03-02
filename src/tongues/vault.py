@@ -68,41 +68,69 @@ class TranslationHeader:
     language: Language
 
 
+def _frontmatter_end(lines: list[str]) -> int:
+    """
+    Return the index of the first line after YAML frontmatter, or 0 if none.
+
+    Frontmatter is recognised as an opening '---' on line 0 followed by a
+    closing '---' on a later line. Unclosed frontmatter is treated as absent.
+    """
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return i + 1
+    return 0  # unclosed — treat as no frontmatter
+
+
 def _parse_original_header(
     lines: list[str],
     languages: list[Language],
 ) -> tuple[OriginalHeader | None, int]:
     """
-    If the first line looks like a language-link bar, parse it.
-    Returns (header_or_None, content_start_index).
+    Parse the language-link header and return (header_or_None, content_start).
 
-    Expected format:
+    YAML frontmatter (---...---) is skipped first; content_start is set past
+    it so frontmatter lines are never counted in alignment comparisons.
+    Blank lines between frontmatter and the language-link line are also skipped.
+
+    Expected language-link format:
       • [[Mi Título de Nota|español]] • [[我的笔记标题|中文]] •
 
-    Line must start with '•', contain at least one wiki-link, and contain
-    nothing besides wiki-links, '•' bullets, and whitespace.
+    The line must start with '•', contain at least one wiki-link, and contain
+    nothing besides wiki-links, '•' bullets, and whitespace. It must be
+    followed by a blank line.
 
     The display text of each wiki-link is matched against configured language
-    names (case-insensitive) to determine which language it corresponds to.
-    Falls back to extracting a lang code from the last dash-segment of the
-    note name if the display text doesn't match any configured language.
+    names (case-insensitive). Falls back to extracting a lang code from the
+    last dash-segment of the note name if no display text matches.
     """
     if not lines:
         return None, 0
 
-    first = lines[0].strip()
+    # Skip YAML frontmatter and any blank lines that follow it.
+    fm_end = _frontmatter_end(lines)
+    pos = fm_end
+    if fm_end > 0:
+        while pos < len(lines) and lines[pos].strip() == "":
+            pos += 1
+
+    if pos >= len(lines):
+        return None, fm_end
+
+    first = lines[pos].strip()
 
     if not first.startswith("•"):
-        return None, 0
+        return None, pos if fm_end > 0 else 0
 
     wiki_links = WIKI_LINK_RE.findall(first)  # [(note_name, display), ...]
     if not wiki_links:
-        return None, 0
+        return None, pos if fm_end > 0 else 0
 
     # Line must contain ONLY wiki-links, '•' bullets, and whitespace
     cleaned = WIKI_LINK_RE.sub("", first).replace("•", "").strip()
     if cleaned:
-        return None, 0
+        return None, pos if fm_end > 0 else 0
 
     lang_by_name = {lang.name.lower(): lang for lang in languages}
     language_links: dict[str, str] = {}  # lang_code -> note_name
@@ -118,9 +146,9 @@ def _parse_original_header(
             if len(parts) == 2 and parts[-1] not in language_links:
                 language_links[parts[-1]] = note_name
 
-    if len(lines) < 2 or lines[1].strip() != "":
-        return None, 0
-    return OriginalHeader(language_links=language_links), 2
+    if pos + 1 >= len(lines) or lines[pos + 1].strip() != "":
+        return None, pos if fm_end > 0 else 0
+    return OriginalHeader(language_links=language_links), pos + 2
 
 
 def _parse_translation_header(

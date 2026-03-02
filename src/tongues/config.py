@@ -89,10 +89,11 @@ Traducido de: [[Original Note Name]]
 
 ## What counts as a valid translation
 
-Line counts and structure are compared **excluding headers on both sides**:
-the original's language-link line (and its following blank line) is stripped,
-and the translation's `translated_from` line (and its following blank line) is
-stripped, before any comparison is made. Only the body content is compared.
+Line counts and structure are compared **excluding headers on both sides**.
+YAML frontmatter (`---...---`) at the top of an original is excluded and need
+not appear in the translation. The original's language-link line (and its
+following blank line) is also stripped, as is the translation's `translated_from`
+line (and its following blank line). Only the body content is compared.
 
 1. Same number of body lines as the original (headers excluded on both sides).
 2. Heading levels match at every line position.
