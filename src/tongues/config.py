@@ -80,7 +80,7 @@ view this line reads simply: `• español • 中文 •`
 ### Translation file header (required)
 
 Line 1 must be `※` followed by the `translated_from` phrase and a wiki-link to
-the original. A blank line must follow.
+the original. A blank line and then `---` must follow.
 
 ```
 ※ Traducido de: [[Original Note Name]]
@@ -94,15 +94,19 @@ the original. A blank line must follow.
 
 Line counts and structure are compared **excluding headers on both sides**.
 YAML frontmatter (`---...---`) at the top of an original is excluded and need
-not appear in the translation. The original's language-link line (and its
-following blank line) is also stripped, as is the translation's `translated_from`
-line (and its following blank line). Only the body content is compared.
+not appear in the translation. The full 3-line header block on each side
+(header line + blank line + `---`) is stripped before any comparison.
+Only the body content is compared.
 
 1. Same number of body lines as the original (headers excluded on both sides).
 2. Heading levels match at every line position.
 3. Bullet/list structure matches at every line position.
-4. Lines that contain links in the original also contain links in the translation
-   (link targets may differ — they should point within the same language universe).
+4. Checkbox states (`[ ]` vs `[x]` etc.) match at every line position.
+5. Lines that contain links in the original also contain links in the translation
+   (same count per line).
+6. Every wiki-link in the translation points to a same-language translation, or
+   to an original as a stand-in with `⍰` in the display text. Broken links,
+   wrong-language links, and stand-ins without `⍰` make the translation invalid.
 
 ## The link universe principle
 
