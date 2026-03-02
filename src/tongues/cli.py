@@ -19,6 +19,7 @@ from rich.panel import Panel
 from .config import load_config, TonguesConfig, Language, DEFAULT_CONFIG_CONTENT, CONFIG_FILENAME
 from .vault import (
     VaultFile,
+    TranslationHeader,
     scan_vault,
     declared_translation_path,
     build_translation_index,
@@ -127,14 +128,27 @@ def _print_link_universe_reminder(
     config: TonguesConfig,
     original: VaultFile,
     all_files: list[VaultFile],
+    *,
+    show_panel: bool = True,
+    show_table: bool = True,
 ) -> None:
-    """Print coaching about link universe correctness for a given original."""
+    """Print link universe coaching for a given original.
+
+    show_panel: show the ⚠ LINK UNIVERSE PRINCIPLE explanation box.
+    show_table: show the per-link target table.
+    Both default to True (full output). Pass show_panel=False when the agent
+    already knows the rule but needs the target table. Pass neither True to
+    suppress entirely (or just don't call the function).
+    """
     internal = original.all_internal_links()
-    if not internal:
+    if not internal or (not show_panel and not show_table):
         return
 
     console.print()
-    console.print(Panel(LINK_UNIVERSE_REMINDER, border_style="yellow"))
+    if show_panel:
+        console.print(Panel(LINK_UNIVERSE_REMINDER, border_style="yellow"))
+    if not show_table:
+        return
 
     table = Table(
         box=box.SIMPLE_HEAD,
@@ -355,19 +369,71 @@ def status(show_all: bool) -> None:
 
 @main.command()
 @click.argument("file")
-def check(file: str) -> None:
+@click.option("--verbose", "-v", is_flag=True,
+              help="Show all issues and always display the link target table.")
+def check(file: str, verbose: bool) -> None:
     """
     Check all translations for a specific original file.
 
-    Prints the status of each language translation, lists alignment issues,
-    and shows which wiki-link targets internal links should use in each language.
+    FILE may be the path to an original file or to any of its translations —
+    passing a translation path will automatically redirect to its original.
+
+    By default shows up to 3 issues per translation with a count of the rest.
+    Use --verbose to see all issues and always display the link target table.
     """
     config = _load_or_exit()
-    original = _resolve_original(config, file)
     all_files = scan_vault(config)
+    index = build_translation_index(all_files)
+
+    # Resolve the file path (cwd-relative, vault-relative, or absolute)
+    target = Path(file)
+    if not target.is_absolute():
+        cwd_path = Path.cwd() / target
+        target = (cwd_path if cwd_path.exists() else config.vault_root / target).resolve()
+    else:
+        target = target.resolve()
+
+    # Check ignore patterns before anything else
+    if target.exists() and config.ignore_patterns:
+        try:
+            rel = target.relative_to(config.vault_root)
+            if is_ignored(rel, config.ignore_patterns):
+                console.print(
+                    f"[dim]{file} is excluded from translation tracking "
+                    f"(matches an ignore pattern in {CONFIG_FILENAME}).[/dim]"
+                )
+                sys.exit(0)
+        except ValueError:
+            pass
+
+    vault_file = index.get(target)
+    if vault_file is None:
+        err_console.print(f"[red]File not found in vault:[/red] {file}")
+        sys.exit(1)
+
+    # Redirect translation paths to their original
+    if vault_file.is_translation:
+        if not isinstance(vault_file.header, TranslationHeader):
+            err_console.print(f"[red]{file}[/red] is a translation file with no valid header.")
+            sys.exit(1)
+        original = _find_by_note_name(all_files, vault_file.header.original_note_name)
+        if original is None:
+            err_console.print(
+                f"[red]Original '{vault_file.header.original_note_name}' not found in vault.[/red]"
+            )
+            sys.exit(1)
+        console.print(f"[dim](translation of {original.rel_path} — checking original)[/dim]")
+    elif not vault_file.is_original:
+        err_console.print(f"[red]{file}[/red] is not a tracked vault file.")
+        sys.exit(1)
+    else:
+        original = vault_file
 
     console.print()
-    console.print(f"👅 [bold]Checking:[/bold] {original.rel_path}")
+    console.print(
+        f"👅 [bold]Checking:[/bold] {original.rel_path}  "
+        f"[dim]({len(original.content_lines)} content lines)[/dim]"
+    )
 
     # Header status
     n_configured = len(config.languages)
@@ -384,12 +450,11 @@ def check(file: str) -> None:
             f" — {names_str}"
         )
     else:
-        console.print(f"  Header: [dim]none yet[/dim] — add a bullet link each time you create a translation: • [[title|lang]] •")
-
-    console.print(f"  Content lines: {len(original.content_lines)}")
+        console.print(
+            f"  Header: [dim]none yet[/dim] — "
+            f"add a bullet link each time you create a translation: • [[title|lang]] •"
+        )
     console.print()
-
-    index = build_translation_index(all_files)
 
     declared = [
         (lang, declared_translation_path(config, original, lang))
@@ -399,16 +464,21 @@ def check(file: str) -> None:
 
     if not declared:
         console.print("[dim]No translations declared yet.[/dim]")
-        _print_link_universe_reminder(config, original, all_files)
+        _print_link_universe_reminder(config, original, all_files,
+                                      show_panel=verbose, show_table=True)
         console.print()
         return
 
+    max_issues = None if verbose else 3
+    any_missing = False
+    has_link_violations = False
+
     for lang, exp_path in declared:
         console.rule(f"[bold]{lang.name}[/bold] [{lang.code}]", style="dim")
-
         exp_rel = exp_path.relative_to(config.vault_root)
 
         if not exp_path.exists():
+            any_missing = True
             console.print(f"  [bold red]MISSING[/bold red]  {exp_rel}")
             console.print(f"  Create this file with this 3-line header block:")
             console.print(f"    [bold]{TRANSLATION_MARKER} {lang.translated_from}: [[{original.path.stem}]][/bold]")
@@ -420,7 +490,8 @@ def check(file: str) -> None:
             )
             console.print(
                 f"  [dim]Internal links must point to same-language translations, or to originals "
-                f"as stand-ins with the {STANDBY_MARKER} marker: [[original-note|{STANDBY_MARKER} display name]][/dim]"
+                f"as stand-ins with the {STANDBY_MARKER} marker: "
+                f"[[original-note|{STANDBY_MARKER} display name]][/dim]"
             )
             continue
 
@@ -440,6 +511,8 @@ def check(file: str) -> None:
 
         result = check_alignment(original, trans_file)
         link_issues = check_link_universe(trans_file, all_files, config)
+        if link_issues:
+            has_link_violations = True
 
         if result.is_valid and not link_issues:
             console.print(f"  [bold green]OK[/bold green]  {exp_rel}")
@@ -461,20 +534,31 @@ def check(file: str) -> None:
                     f"({len(link_issues)} issue(s))"
                 )
 
-            for issue in result.issues[:5]:
+            shown = result.issues[:max_issues] if max_issues is not None else result.issues
+            for issue in shown:
                 console.print(f"    Line {issue.line_num}: {issue.describe()}")
-            if len(result.issues) > 5:
+            if max_issues is not None and len(result.issues) > max_issues:
                 console.print(
-                    f"    … {len(result.issues) - 5} more. "
-                    f"Run: tongues inspect {original.rel_path} {lang.code}"
+                    f"    [dim]… and {len(result.issues) - max_issues} more. "
+                    f"Run: tongues inspect {original.rel_path} {lang.code}[/dim]"
                 )
-            for issue in link_issues[:5]:
-                console.print(f"    Line {issue.line_num}: {issue.describe()}")
-            if len(link_issues) > 5:
-                console.print(f"    … {len(link_issues) - 5} more link issues")
 
-    # Link universe coaching
-    _print_link_universe_reminder(config, original, all_files)
+            shown_links = link_issues[:max_issues] if max_issues is not None else link_issues
+            for issue in shown_links:
+                console.print(f"    Line {issue.line_num}: {issue.describe()}")
+            if max_issues is not None and len(link_issues) > max_issues:
+                console.print(f"    [dim]… and {len(link_issues) - max_issues} more link issues[/dim]")
+
+    # Link universe reminder — panel only when there are violations; table when
+    # translations are missing (agent needs the target list) or verbose mode.
+    if verbose or has_link_violations:
+        _print_link_universe_reminder(config, original, all_files,
+                                      show_panel=True, show_table=True)
+    elif any_missing:
+        _print_link_universe_reminder(config, original, all_files,
+                                      show_panel=False, show_table=True)
+    # all OK → no reminder
+
     console.print()
 
 
@@ -485,11 +569,14 @@ def check(file: str) -> None:
 @main.command()
 @click.argument("file")
 @click.argument("lang")
-def inspect(file: str, lang: str) -> None:
+@click.option("--max-issues", default=None, type=int, metavar="N",
+              help="Show at most N issues in the alignment table (default: all).")
+def inspect(file: str, lang: str, max_issues: int | None) -> None:
     """
     Full alignment diff for one original/language pair.
 
     FILE is the original file. LANG is the language code (e.g. es, zh).
+    Use --max-issues N to cap the table when there are many issues.
     """
     config = _load_or_exit()
     original = _resolve_original(config, file)
@@ -583,6 +670,8 @@ def inspect(file: str, lang: str) -> None:
 
     # Issues table
     if result.issues:
+        shown = result.issues[:max_issues] if max_issues is not None else result.issues
+        hidden = len(result.issues) - len(shown)
         console.print(f"[bold]Structural issues[/bold] ({len(result.issues)}):")
         table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold", expand=True)
         table.add_column("Line", style="dim", width=5)
@@ -590,7 +679,7 @@ def inspect(file: str, lang: str) -> None:
         table.add_column("Original", overflow="fold")
         table.add_column("Translation", overflow="fold")
 
-        for issue in result.issues:
+        for issue in shown:
             table.add_row(
                 str(issue.line_num),
                 issue.issue_type.replace("_", " "),
@@ -599,6 +688,11 @@ def inspect(file: str, lang: str) -> None:
             )
 
         console.print(table)
+        if hidden:
+            console.print(
+                f"[dim]… and {hidden} more issue(s) not shown "
+                f"(remove --max-issues to see all)[/dim]"
+            )
 
     _print_link_universe_reminder(config, original, all_files)
     console.print()

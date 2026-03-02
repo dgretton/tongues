@@ -111,8 +111,13 @@ class AlignmentResult:
 
 def check_alignment(original: VaultFile, translation: VaultFile) -> AlignmentResult:
     """Return a full alignment report for one original/translation pair."""
+    # Strip trailing blank lines — they're editor noise, not structural content.
     orig_content = original.content_lines
+    while orig_content and not orig_content[-1].strip():
+        orig_content = orig_content[:-1]
     trans_content = translation.content_lines
+    while trans_content and not trans_content[-1].strip():
+        trans_content = trans_content[:-1]
 
     result = AlignmentResult(
         original=original,

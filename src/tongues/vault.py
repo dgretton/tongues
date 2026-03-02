@@ -50,6 +50,10 @@ TRANSLATION_MARKER = "※"
 
 # Marker used in stand-in link display text when translation doesn't exist yet:
 # [[Original Note|⍰ Artículos]]
+# NOTE: if ⍰ proves too hard to type, switch to a leading plain '?' instead
+# (e.g. [[Original Note|? Artículos]]), and tighten the detection rule from
+# "⍰ present anywhere in display" to "display text starts with ?" to avoid
+# false matches on titles that happen to contain a question mark.
 STANDBY_MARKER = "⍰"
 
 
