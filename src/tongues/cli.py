@@ -208,9 +208,12 @@ def main() -> None:
     Quick start for AI agents:
       uv tool install git+https://github.com/dgretton/tongues.git  # install if absent
       uv tool upgrade tongues          # always upgrade before use
+      tongues upgrade-docs             # refresh vault config docs after upgrade
       tongues status                   # see what needs work
       tongues check <file.md>          # inspect a specific original
       tongues inspect <file.md> <lang> # detailed alignment diff
+
+    Read tongues-config.md in the vault for detailed guidance and format specs.
     """
 
 
