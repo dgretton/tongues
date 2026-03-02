@@ -24,9 +24,11 @@ from .vault import (
     build_translation_index,
     is_ignored,
     WIKI_LINK_RE,
+    TRANSLATION_MARKER,
+    STANDBY_MARKER,
 )
 from .status import compute_status, VaultStatus, TranslationRecord
-from .alignment import check_alignment
+from .alignment import check_alignment, check_link_universe, LinkUniverseIssue
 
 console = Console()
 err_console = Console(stderr=True)
@@ -54,6 +56,7 @@ def _status_style(label: str) -> str:
         "NO HEADER": "bold red",
         "LINE COUNT": "bold yellow",
         "MISALIGNED": "bold yellow",
+        "BAD LINKS": "bold red",
         "ERROR": "bold red",
     }.get(label, "white")
 
@@ -290,7 +293,8 @@ def status(show_all: bool) -> None:
                 console.print(
                     f"    [dim]No {r.language.name} link in header — "
                     f"add one when you create the translation: "
-                    f"• [[translated-title|{r.language.name}]] •[/dim]"
+                    f"• [[translated-title|{r.language.name}]] •  "
+                    f"(line 1 of translation: {TRANSLATION_MARKER} {r.language.translated_from}: [[original-note-name]])[/dim]"
                 )
                 continue
 
@@ -312,6 +316,14 @@ def status(show_all: bool) -> None:
                     f"    [dim]File exists but has no valid "
                     f"'{r.language.translated_from}: [[...]]' header.[/dim]"
                 )
+            elif r.status == "invalid_links":
+                for issue in r.link_issues[:3]:
+                    console.print(f"    [dim]Line {issue.line_num}:[/dim] {issue.issue_type.replace('_', ' ')}: [[{issue.target}]]")
+                if len(r.link_issues) > 3:
+                    console.print(
+                        f"    [dim]… and {len(r.link_issues) - 3} more. "
+                        f"Run: tongues check {orig_rel}[/dim]"
+                    )
             elif r.alignment:
                 if not r.alignment.line_count_match:
                     console.print(
@@ -399,10 +411,14 @@ def check(file: str) -> None:
         if not exp_path.exists():
             console.print(f"  [bold red]MISSING[/bold red]  {exp_rel}")
             console.print(f"  Create this file. Line 1:")
-            console.print(f"    [bold]{lang.translated_from}: [[{original.path.stem}]][/bold]")
+            console.print(f"    [bold]{TRANSLATION_MARKER} {lang.translated_from}: [[{original.path.stem}]][/bold]")
             console.print(
                 f"  Then a blank line, then {len(original.content_lines)} lines of body content "
                 f"(matching the original's structure)."
+            )
+            console.print(
+                f"  [dim]Internal links must point to same-language translations, or to originals "
+                f"as stand-ins with the {STANDBY_MARKER} marker: [[original-note|{STANDBY_MARKER} display name]][/dim]"
             )
             continue
 
@@ -416,13 +432,14 @@ def check(file: str) -> None:
             console.print(f"  [bold red]NO HEADER[/bold red]  {exp_rel}")
             console.print(
                 f"  File exists but first line doesn't match "
-                f"'{lang.translated_from}: [[original note name]]'"
+                f"'{TRANSLATION_MARKER} {lang.translated_from}: [[original note name]]'"
             )
             continue
 
         result = check_alignment(original, trans_file)
+        link_issues = check_link_universe(trans_file, all_files, config)
 
-        if result.is_valid:
+        if result.is_valid and not link_issues:
             console.print(f"  [bold green]OK[/bold green]  {exp_rel}")
         else:
             if not result.line_count_match:
@@ -431,10 +448,15 @@ def check(file: str) -> None:
                     f"  original={result.original_content_lines} lines, "
                     f"translation={result.translation_content_lines} lines"
                 )
-            else:
+            elif result.issues:
                 console.print(
                     f"  [bold yellow]MISALIGNED[/bold yellow]  {exp_rel}  "
                     f"({len(result.issues)} issue(s))"
+                )
+            if link_issues:
+                console.print(
+                    f"  [bold red]BAD LINKS[/bold red]  {exp_rel}  "
+                    f"({len(link_issues)} issue(s))"
                 )
 
             for issue in result.issues[:5]:
@@ -444,6 +466,10 @@ def check(file: str) -> None:
                     f"    … {len(result.issues) - 5} more. "
                     f"Run: tongues inspect {original.rel_path} {lang.code}"
                 )
+            for issue in link_issues[:5]:
+                console.print(f"    Line {issue.line_num}: {issue.describe()}")
+            if len(link_issues) > 5:
+                console.print(f"    … {len(link_issues) - 5} more link issues")
 
     # Link universe coaching
     _print_link_universe_reminder(config, original, all_files)
@@ -488,7 +514,8 @@ def inspect(file: str, lang: str) -> None:
         )
         console.print(
             f"Replace 'translated-title' with the actual translated title, "
-            f"then create the translation file."
+            f"then create the translation file with line 1:\n"
+            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
         )
         all_files = scan_vault(config)
         _print_link_universe_reminder(config, original, all_files)
@@ -503,7 +530,7 @@ def inspect(file: str, lang: str) -> None:
         console.print(f"Expected at: {exp_rel}")
         console.print(
             f"\nCreate it with this header on line 1:\n"
-            f"  [bold]{lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
+            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
         )
         console.print(
             f"\nThen a blank line, then {len(original.content_lines)} lines of translated content."
@@ -520,7 +547,7 @@ def inspect(file: str, lang: str) -> None:
         console.print(f"[bold red]Translation header missing.[/bold red]")
         console.print(
             f"Line 1 of {exp_rel} must be:\n"
-            f"  [bold]{lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
+            f"  [bold]{TRANSLATION_MARKER} {lang_obj.translated_from}: [[{original.path.stem}]][/bold]"
         )
         _print_link_universe_reminder(config, original, all_files)
         return
@@ -625,7 +652,7 @@ def languages() -> None:
     for lang in config.languages:
         console.print(
             f"  [{lang.code}]  {lang.name}  "
-            f"[dim]header phrase: \"{lang.translated_from}: [[original note name]]\"[/dim]"
+            f"[dim]translation header: \"{TRANSLATION_MARKER} {lang.translated_from}: [[original note name]]\"[/dim]"
         )
     console.print(
         f"\n[dim]Translations folder: {config.translations_folder}[/dim]"

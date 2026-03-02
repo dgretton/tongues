@@ -78,10 +78,11 @@ view this line reads simply: `• español • 中文 •`
 
 ### Translation file header (required)
 
-Line 1 must be the `translated_from` phrase followed by a wiki-link to the original.
+Line 1 must be `※` followed by the `translated_from` phrase and a wiki-link to
+the original. A blank line must follow.
 
 ```
-Traducido de: [[Original Note Name]]
+※ Traducido de: [[Original Note Name]]
 
 # Título de la nota
 ...
@@ -110,7 +111,17 @@ If original A links to original B, the Spanish translation of A must link to the
 Spanish translation of B (not to B itself). This creates parallel universes of links —
 a reader clicks their language once and stays in it as they follow every subsequent link.
 
-Use `tongues check <file>` to see the expected wiki-link targets for every link in a file.
+When B's translation does not exist yet, link to the original B as a stand-in, using
+`⍰` in the display text to signal that the translation is absent:
+
+```
+[[Original Note Name|⍰ Nombre en español]]
+```
+
+Links that point to non-existent notes, to translations in a different language, or to
+originals without the `⍰` marker make the translation **invalid** in tongues' eyes.
+
+Use `tongues check <file>` to see required link targets and validate existing links.
 """
 
 

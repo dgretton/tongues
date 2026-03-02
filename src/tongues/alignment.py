@@ -1,13 +1,17 @@
 """
-Structural alignment checking between an original and its translation.
+Structural alignment checking between an original and its translation,
+and link-universe validation for translation files.
 
 A translation is considered valid when:
   1. Content line count matches the original.
   2. Every heading has the same level (# count) at the same line position.
   3. Bullet/list markers appear at the same line positions.
-  4. Lines that contain links in the original also contain links in the
-     translation (link targets may differ — they should point to the same
-     language universe, but that is a coaching concern, not a validity check).
+  4. Checkbox states ([ ] vs [x]) match at every line position.
+  5. Lines that contain links in the original also contain links in the
+     translation (same count).
+  6. Every wiki-link in the translation's content points to either a
+     same-language translation file or an original used as a stand-in
+     (stand-ins must include the ⍰ marker in their display text).
 """
 
 from __future__ import annotations
@@ -15,7 +19,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .vault import VaultFile, HEADING_RE, BULLET_RE, CHECKBOX_RE, LINK_RE, WIKI_LINK_RE
+from .config import TonguesConfig
+from .vault import (
+    VaultFile, TranslationHeader,
+    HEADING_RE, BULLET_RE, CHECKBOX_RE, LINK_RE, WIKI_LINK_RE,
+    STANDBY_MARKER,
+)
 
 
 def _count_links(line: str) -> int:
@@ -162,3 +171,91 @@ def check_alignment(original: VaultFile, translation: VaultFile) -> AlignmentRes
             result.issues.append(AlignmentIssue(line_num, AlignmentIssue.LINK_COUNT, o, t))
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Link-universe validation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LinkUniverseIssue:
+    line_num: int       # 1-indexed within content
+    target: str         # note name as written in the wiki-link
+    display: str        # display text as written (may be empty)
+    issue_type: str
+    found_lang: str | None = None   # for WRONG_LANGUAGE: the language code found
+
+    BROKEN = "broken_link"              # target not found in vault
+    WRONG_LANGUAGE = "wrong_language"   # target is a translation in a different language
+    MISSING_STANDBY = "missing_standby" # target is an original but ⍰ is absent from display
+
+    def describe(self) -> str:
+        t = self.issue_type
+        if t == self.BROKEN:
+            return (
+                f"[[{self.target}]] not found in vault — "
+                f"if the translation doesn't exist yet, link to the original as a stand-in: "
+                f"[[original-note-name|{STANDBY_MARKER} {self.target}]]"
+            )
+        if t == self.WRONG_LANGUAGE:
+            return (
+                f"[[{self.target}]] is a [{self.found_lang}] translation — "
+                f"links must stay within the same language universe"
+            )
+        if t == self.MISSING_STANDBY:
+            display = self.display or self.target
+            return (
+                f"[[{self.target}]] links to an original without the {STANDBY_MARKER} stand-in marker — "
+                f"use [[{self.target}|{STANDBY_MARKER} {display}]]"
+            )
+        return f"{t}: [[{self.target}]]"
+
+
+def check_link_universe(
+    translation: VaultFile,
+    all_files: list[VaultFile],
+    config: TonguesConfig,
+) -> list[LinkUniverseIssue]:
+    """
+    Validate that every wiki-link in a translation's content follows the
+    link universe convention:
+      - Points to a translation in the SAME language, OR
+      - Points to an original as a stand-in, with ⍰ in the display text.
+    Anything else (broken link, wrong-language translation, original without ⍰)
+    is an issue that makes the translation invalid.
+    """
+    issues = []
+    if not isinstance(translation.header, TranslationHeader):
+        return issues
+
+    this_lang_code = translation.header.language.code
+    by_stem: dict[str, VaultFile] = {f.path.stem: f for f in all_files}
+
+    for i, line in enumerate(translation.content_lines):
+        for note_name, display in WIKI_LINK_RE.findall(line):
+            note_name = note_name.strip()
+            linked = by_stem.get(note_name)
+
+            if linked is None:
+                issues.append(LinkUniverseIssue(
+                    line_num=i + 1, target=note_name, display=display,
+                    issue_type=LinkUniverseIssue.BROKEN,
+                ))
+            elif linked.is_translation:
+                if (isinstance(linked.header, TranslationHeader)
+                        and linked.header.language.code != this_lang_code):
+                    issues.append(LinkUniverseIssue(
+                        line_num=i + 1, target=note_name, display=display,
+                        issue_type=LinkUniverseIssue.WRONG_LANGUAGE,
+                        found_lang=linked.header.language.code,
+                    ))
+                # same language (or unrecognised header) → OK
+            else:
+                # Points to an original — stand-in, must have ⍰ in display
+                if STANDBY_MARKER not in display:
+                    issues.append(LinkUniverseIssue(
+                        line_num=i + 1, target=note_name, display=display,
+                        issue_type=LinkUniverseIssue.MISSING_STANDBY,
+                    ))
+
+    return issues

@@ -45,6 +45,13 @@ BULLET_RE = re.compile(r'^\s*([-*+]|\d+\.)\s')
 # Checkbox item: - [ ], - [x], - [/], etc. — captures the state character
 CHECKBOX_RE = re.compile(r'^\s*[-*+]\s+\[(.)\]')
 
+# Marker prepended to all translation headers: ※ Traducido de: [[Original]]
+TRANSLATION_MARKER = "※"
+
+# Marker used in stand-in link display text when translation doesn't exist yet:
+# [[Original Note|⍰ Artículos]]
+STANDBY_MARKER = "⍰"
+
 
 # ---------------------------------------------------------------------------
 # Header parsing
@@ -156,22 +163,28 @@ def _parse_translation_header(
     languages: list[Language],
 ) -> tuple[TranslationHeader | None, int]:
     """
-    If the first line matches a known 'translated from' phrase, parse it.
+    If the first line matches the translation header format, parse it.
     Returns (header_or_None, content_start_index).
 
-    Expected format:
-      Traducido de: [[Original Note Name]]
+    Required format (※ marker is mandatory, blank line after is mandatory):
+      ※ Traducido de: [[Original Note Name]]
+
     """
     if not lines:
         return None, 0
 
     first = lines[0].strip()
 
+    if not first.startswith(TRANSLATION_MARKER):
+        return None, 0
+
+    after_marker = first[len(TRANSLATION_MARKER):].strip()
+
     for lang in languages:
         phrase = lang.translated_from
-        if not first.lower().startswith(phrase.lower()):
+        if not after_marker.lower().startswith(phrase.lower()):
             continue
-        wiki_links = WIKI_LINK_RE.findall(first)
+        wiki_links = WIKI_LINK_RE.findall(after_marker)
         if not wiki_links:
             continue
         note_name, _display = wiki_links[0]

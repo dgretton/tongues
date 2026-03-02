@@ -25,7 +25,7 @@ from .vault import (
     build_translation_index,
     find_translation_collisions,
 )
-from .alignment import check_alignment, AlignmentResult
+from .alignment import check_alignment, AlignmentResult, check_link_universe, LinkUniverseIssue
 
 
 # ---------------------------------------------------------------------------
@@ -36,9 +36,10 @@ from .alignment import check_alignment, AlignmentResult
 class TranslationRecord:
     original: VaultFile
     language: Language
-    expected_path: Path | None      # None when no header entry declares a path
-    translation: VaultFile | None   # None when file is absent or unmapped
-    alignment: AlignmentResult | None  # None when file is absent or header missing
+    expected_path: Path | None          # None when no header entry declares a path
+    translation: VaultFile | None       # None when file is absent or unmapped
+    alignment: AlignmentResult | None   # None when file is absent or header missing
+    link_issues: list[LinkUniverseIssue] = field(default_factory=list)
 
     @property
     def status(self) -> str:
@@ -54,6 +55,8 @@ class TranslationRecord:
             return "line_count_mismatch"
         if self.alignment.issues:
             return "misaligned"
+        if self.link_issues:
+            return "invalid_links"
         return "ok"
 
     @property
@@ -69,6 +72,7 @@ class TranslationRecord:
             "error": "ERROR",
             "line_count_mismatch": "LINE COUNT",
             "misaligned": "MISALIGNED",
+            "invalid_links": "BAD LINKS",
             "ok": "OK",
         }.get(self.status, self.status.upper())
 
@@ -124,10 +128,13 @@ def compute_status(config: TonguesConfig) -> VaultStatus:
 
             if trans_file is None:
                 alignment = None
+                link_issues = []
             elif trans_file.header is None:
                 alignment = None
+                link_issues = []
             else:
                 alignment = check_alignment(original, trans_file)
+                link_issues = check_link_universe(trans_file, all_files, config)
 
             records.append(TranslationRecord(
                 original=original,
@@ -135,6 +142,7 @@ def compute_status(config: TonguesConfig) -> VaultStatus:
                 expected_path=exp_path,
                 translation=trans_file,
                 alignment=alignment,
+                link_issues=link_issues,
             ))
 
     collisions = find_translation_collisions(config, originals)
